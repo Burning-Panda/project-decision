@@ -1,9 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { MemoryStore } from './store.js';
-
-const MAPS = ['owners', 'teams', 'projects', 'decisions', 'revisions', 'profiles'];
-const ARRAYS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications', 'webhooks', 'events', 'deliveries', 'channel_deliveries'];
-const RECORDS = ['idempotency', 'counters'];
+import { MemoryStore, MAP_COLLECTIONS as MAPS, ARRAY_COLLECTIONS as ARRAYS, RECORD_COLLECTIONS as RECORDS } from './store.js';
 
 /**
  * Durable store: the working set lives in memory (same shape as MemoryStore) and commit()

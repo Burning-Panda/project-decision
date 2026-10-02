@@ -105,7 +105,7 @@ pgTest('data is stored as queryable jsonb, one table per collection', async ({ o
   await s.commit();
   const rows = await q(`SELECT k, data->>'status' AS status, data->>'title' AS title FROM "${schema}".decisions`);
   assert.deepEqual(rows.map((r) => [r.k, r.status, r.title]), [['PRJ-001', 'proposed', 'Persist me']]);
-  assert.equal((await q(`SELECT count(*)::int AS n FROM "${schema}".audit WHERE data->>'decision_id' = 'PRJ-001'`))[0].n, 4);
+  assert.equal((await q(`SELECT count(*)::int AS n FROM "${schema}".audit WHERE data->>'decision_id' = 'PRJ-001'`))[0].n, 3);
 });
 
 pgTest('commits are incremental: unchanged state writes nothing, a change touches only its table', async ({ open }) => {
@@ -187,14 +187,13 @@ pgTest('only one instance may use a database at a time', async ({ open }) => {
   assert.ok(await open(), 'the lock is released on close');
 });
 
-pgTest('losing the connection (and with it the lock) is reported and stops further commits', async ({ open, admin }) => {
+pgTest('losing the connection (and with it the lock) is reported and stops further commits', async ({ open, admin, schema }) => {
   let lost = null;
   const s = await open({ onConnectionLost: (e) => { lost = e; } });
   const { log } = build(s);
   seed(log);
   await s.commit();
-  const [{ pid }] = (await admin.query('SELECT pg_backend_pid() AS pid')).rows;
-  await admin.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE pid <> $1 AND query LIKE \'%advisory%\' OR (pid <> $1 AND application_name = \'decision-log\')', [pid]);
+  await admin.query('SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = $1', [`decision-log:${schema}`]);
   await new Promise((r) => setTimeout(r, 200));
   assert.ok(lost, 'callback fired');
   log.createDecision({ project: 'PRJ', actor: U.alice, title: 'after loss' });

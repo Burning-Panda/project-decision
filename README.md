@@ -2,12 +2,13 @@
 
 Immutable decision tracking with an approval workflow, voting modes, revisions/diffs, comments,
 meeting transcripts, follow-up todos, related-decision discovery and a hash-chained audit trail.
-Zero runtime dependencies (Node >= 22.13).
+No required runtime dependencies (Node >= 22.13); the optional `pg` driver is only needed for PostgreSQL.
 
 ```
-npm test                       # 170 tests (node:test)
+npm test                       # 189 tests (node:test); the 12 PostgreSQL tests need TEST_DATABASE_URL
 PORT=3000 npm start                      # in-memory
-PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite (recommended)
+PORT=3000 DATABASE_URL=postgres://... npm start  # PostgreSQL (see docs/POSTGRES.md)
+PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite
 PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 ```
 
@@ -19,7 +20,7 @@ PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 | `src/queries.js` | List, search, dashboard, reports, export |
 | `src/voting.js`, `src/settings.js` | Approval-mode evaluation and project settings |
 | `src/diff.js`, `src/related.js`, `src/template.js` | Section-aware diff, pluggable related-decision finder, default template |
-| `src/store.js`, `src/sqlite-store.js` | In-memory store with JSON snapshots; SQLite store that commits changed rows transactionally |
+| `src/store.js`, `src/sqlite-store.js`, `src/postgres-store.js` | In-memory store with JSON snapshots; SQLite and PostgreSQL stores that commit changed rows transactionally (`docs/POSTGRES.md`) |
 | `src/notifications/` | Standard `NotificationPayload`, `NotificationChannel` interface + conformance kit, `NotificationManager`, `EmailChannel`, MIME and SMTP client (see `docs/NOTIFICATIONS.md`) |
 | `src/secrets.js` | AES-256-GCM `SecretBox` for secrets at rest |
 | `src/webhooks.js`, `src/net.js` | Webhook dispatcher (signing, retries, SSRF guard), `verifySignature` for receivers |
@@ -84,5 +85,5 @@ implemented. How to add one, the payload structure and the email configuration: 
 
 ## Not built yet
 
-Postgres storage/migrations (SQLite is the durable option for now), browser audio recording and the speech-to-text call (the service accepts
+browser audio recording and the speech-to-text call (the service accepts
 a finished transcript via `add_meeting`), SMS and push channels (interface and docs are in place), a UI for notification settings.

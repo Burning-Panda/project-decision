@@ -1,8 +1,15 @@
 /** In-memory store with JSON snapshot support. Plain data only, so it can be swapped for a DB-backed store. */
-const MAPS = ['owners', 'teams', 'projects', 'decisions', 'revisions', 'profiles'];
-const ARRAYS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications', 'webhooks', 'events', 'deliveries', 'channel_deliveries'];
+export const MAP_COLLECTIONS = ['owners', 'teams', 'projects', 'decisions', 'revisions', 'profiles'];
+export const ARRAY_COLLECTIONS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications', 'webhooks', 'events', 'deliveries', 'channel_deliveries'];
+
+/** Plain objects keyed by name (idempotency cache, counters). */
+export const RECORD_COLLECTIONS = ['idempotency', 'counters'];
+const MAPS = MAP_COLLECTIONS;
+const ARRAYS = ARRAY_COLLECTIONS;
 
 export class MemoryStore {
+  persistent = false;
+
   constructor() {
     for (const m of MAPS) this[m] = new Map();
     for (const a of ARRAYS) this[a] = [];

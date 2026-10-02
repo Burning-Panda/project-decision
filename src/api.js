@@ -21,7 +21,9 @@ async function readJson(req) {
   }
   if (!size) return {};
   try {
-    const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    const text = Buffer.concat(chunks).toString('utf8');
+    if (/\\u0000/i.test(text)) throw new Error('NUL character'); // PostgreSQL jsonb cannot store U+0000
+    const body = JSON.parse(text);
     if (body === null || typeof body !== 'object' || Array.isArray(body)) throw new Error('not an object');
     return body;
   } catch {
@@ -150,7 +152,7 @@ export function createApp(log, { onMutation } = {}) {
       ctx.ip = req.socket.remoteAddress;
       ctx.body = ['POST', 'PATCH', 'PUT'].includes(req.method) ? await readJson(req) : {};
       const out = await match.handler(ctx);
-      if (req.method !== 'GET') onMutation?.();
+      if (req.method !== 'GET') await onMutation?.(); // durable before we acknowledge
       send(out);
     } catch (e) {
       if (!(e instanceof DecisionLogError)) console.error(e);

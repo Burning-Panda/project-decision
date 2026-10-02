@@ -10,7 +10,7 @@ import { EVENT_TYPES, isValidEventPattern, matchesEvent } from './webhooks.js';
 import { validateWebhookUrl } from './net.js';
 import { randomBytes } from 'node:crypto';
 import { SecretBox } from './secrets.js';
-import { sha256, isValidEmail, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
+import { sha256, canon, isValidEmail, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
 
 export { MemoryStore, DecisionLogError };
 
@@ -103,8 +103,9 @@ export class DecisionLog {
       ip: extra.ip ?? null,
       detail: extra.detail ?? null,
       prev_hash: prev?.hash ?? GENESIS,
+      hv: 2, // hash version: 2 = hash of canonical (key-sorted) JSON, so stores may reorder keys; absent = legacy insertion order
     };
-    entry.hash = sha256(JSON.stringify(entry));
+    entry.hash = sha256(canon(entry));
     audit.push(entry);
   }
 
@@ -1176,7 +1177,8 @@ export class DecisionLog {
     let prev = GENESIS;
     for (const e of this.store.audit) {
       const { hash, ...rest } = e;
-      if (rest.prev_hash !== prev || sha256(JSON.stringify(rest)) !== hash) return { ok: false, broken_at: e.seq };
+      const expected = sha256(rest.hv === 2 ? canon(rest) : JSON.stringify(rest));
+      if (rest.prev_hash !== prev || expected !== hash) return { ok: false, broken_at: e.seq };
       prev = hash;
     }
     return { ok: true, broken_at: null };

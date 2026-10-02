@@ -1,6 +1,12 @@
 import { createHash } from 'node:crypto';
 
 export const sha256 = (s) => createHash('sha256').update(s).digest('hex');
+/** JSON.stringify with sorted keys, so equal values serialise identically regardless of key order. */
+export function canon(v) {
+  if (Array.isArray(v)) return `[${v.map(canon).join(',')}]`;
+  if (v && typeof v === 'object') return `{${Object.keys(v).sort().filter((k) => v[k] !== undefined).map((k) => `${JSON.stringify(k)}:${canon(v[k])}`).join(',')}}`;
+  return JSON.stringify(v);
+}
 export const clone = (o) => (o === undefined ? undefined : structuredClone(o));
 export const pad = (n, w = 3) => String(n).padStart(w, '0');
 export const dateOf = (iso) => iso.slice(0, 10);
