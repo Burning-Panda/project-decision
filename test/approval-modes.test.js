@@ -166,3 +166,37 @@ test('veto: a lead can still approve explicitly', () => {
   const id = proposed(log);
   assert.equal(act(log, id, U.lead, 'approve').decision.status, 'approved');
 });
+
+// ---- weighted quorum ----
+test('quorum: role weights make a lead count for more', () => {
+  const { log } = setup({ mode: 'quorum', quorum_percentage: 50, vote_weights: { lead: 3 } });
+  const id = proposed(log);
+  // total weight = 1+1+1+3 = 6; the lead alone is 50% turnout and a unanimous majority
+  const r = vote(log, id, U.lead, 'approve');
+  assert.equal(r.decision.status, 'approved');
+  assert.deepEqual(r.metadata.vote_tally, { approve: 1, request_revision: 0, abstain: 0 }, 'tally still reports head-counts');
+});
+
+test('quorum: weighted opposition outweighs more numerous approvals', () => {
+  const { log } = setup({ mode: 'quorum', quorum_percentage: 50, vote_weights: { lead: 3 } });
+  const id = proposed(log);
+  vote(log, id, U.bob, 'approve');
+  vote(log, id, U.carol, 'approve');
+  const r = vote(log, id, U.lead, 'request_revision', 'blocking concern'); // 2 vs 3
+  assert.equal(r.decision.status, 'proposed');
+});
+
+test('without weights the same lead vote is not enough', () => {
+  const { log } = setup({ mode: 'quorum', quorum_percentage: 50 });
+  const id = proposed(log);
+  assert.equal(vote(log, id, U.lead, 'approve').decision.status, 'proposed');
+});
+
+test('vote_weights are validated', () => {
+  const { log } = setup();
+  const bad = (w) => assertCode(() => log.updateProjectSettings('PRJ', U.org, { approval_settings: { vote_weights: w } }), 'VALIDATION_ERROR', 400);
+  bad({ lead: 0 });
+  bad({ lead: 'heavy' });
+  bad({ king: 2 });
+  assert.equal(log.getProject('PRJ').approval_settings.vote_weights.member, 1);
+});

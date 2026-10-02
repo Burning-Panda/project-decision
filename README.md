@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 20).
 
 ```
-npm test                       # 84 tests (node:test)
+npm test                       # 88 tests (node:test)
 PORT=3000 DATA_FILE=data.json npm start
 ```
 
@@ -30,6 +30,7 @@ PORT=3000 DATA_FILE=data.json npm start
 - **Consensus**: approved when non-abstain votes >= `consensus_min_votes` **and** approve share >=
   `consensus_approval_threshold` (the plan's "80% OR 5 votes" was ambiguous; AND is the safer reading).
   A `request_revision` vote is counted, not an immediate veto; use the `request_revision` action to send it back.
+- **Quorum weights**: `vote_weights` (per team role, default 1) weight turnout and majority in quorum mode only; reported tallies stay head-counts.
 - **Veto**: a `request_revision` vote (with reason) returns the decision to draft. `sweep()` auto-approves
   after `auto_approve_after_days`; the server runs it every minute.
 - **Immutability**: content is hashed (SHA-256) on propose. `verifyIntegrity()` re-checks decision and all revisions.
@@ -40,4 +41,4 @@ PORT=3000 DATA_FILE=data.json npm start
 ## Not built yet
 
 React UI, Postgres storage/migrations, browser audio recording and the speech-to-text call (the service accepts
-a finished transcript via `add_meeting`), webhooks/email, weighted votes.
+a finished transcript via `add_meeting`), webhooks/email.

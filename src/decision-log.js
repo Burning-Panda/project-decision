@@ -74,6 +74,11 @@ export class DecisionLog {
   _eligibleVoters(d) {
     return this._teamOf(d).members.map((m) => m.user).filter((u) => u !== d.owner);
   }
+  _weightOf(d) {
+    const team = this._teamOf(d);
+    const weights = this._settingsOf(d).vote_weights;
+    return (user) => weights[this._memberOf(team, user)?.role ?? 'member'] ?? 1;
+  }
   _settingsOf(d) { return this._project(d.project).approval_settings; }
 
   _audit(actor, action, decisionId, before, after, extra = {}) {
@@ -519,9 +524,10 @@ export class DecisionLog {
     if (veto && vote === 'request_revision') return this._requestRevision(d, actor, comment, null, settings);
 
     const votes = this._effectiveVotes(d);
-    const tally = tallyVotes(votes);
-    const metadata = { vote_tally: tally };
-    if (isApproved(settings, tally, this._eligibleVoters(d).length)) {
+    const metadata = { vote_tally: tallyVotes(votes) };
+    const weightOf = settings.mode === 'quorum' ? this._weightOf(d) : () => 1;
+    const eligible = this._eligibleVoters(d).reduce((sum, u) => sum + weightOf(u), 0);
+    if (isApproved(settings, tallyVotes(votes, weightOf), eligible)) {
       const approvers = votes.filter((v) => v.vote === 'approve').map((v) => ({ user: v.voter, approved_at: v.voted_at, comment: v.comment }));
       this._markApproved(d, approvers, actor);
       return { status_code: 202, metadata, message: `Vote recorded; ${d.id} approved` };

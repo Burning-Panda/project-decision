@@ -4,12 +4,12 @@
  * Returns true when the decision should be approved.
  *
  * consensus_voting: non-abstain votes >= consensus_min_votes AND approve share >= threshold.
- * quorum:           turnout (incl. abstentions) >= quorum_percentage AND approve share meets the majority type.
+ * quorum:           (role-weighted) turnout (incl. abstentions) >= quorum_percentage AND approve share meets the majority type.
  * single_approval / veto: never closed by votes (approver action or auto-approve sweep).
  */
-export function tallyVotes(votes) {
+export function tallyVotes(votes, weightOf = () => 1) {
   const t = { approve: 0, request_revision: 0, abstain: 0 };
-  for (const v of votes) t[v.vote]++;
+  for (const v of votes) t[v.vote] += weightOf(v.voter);
   return t;
 }
 

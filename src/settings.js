@@ -16,10 +16,18 @@ export const DEFAULT_APPROVAL_SETTINGS = Object.freeze({
   auto_approve_after_days: null,
   notification_on_vote: true,
   revision_vote_resets_count: true,
+  vote_weights: { member: 1, lead: 1, admin: 1 }, // quorum mode only
 });
 
 export function resolveSettings(input = {}, base = DEFAULT_APPROVAL_SETTINGS) {
   const s = { ...base, ...input };
+  const weights = input.vote_weights ?? {};
+  if (typeof weights !== 'object' || weights === null || Array.isArray(weights)) throw invalid('vote_weights must be an object');
+  for (const [role, w] of Object.entries(weights)) {
+    if (!(role in DEFAULT_APPROVAL_SETTINGS.vote_weights)) throw invalid(`vote_weights: unknown role "${role}"`);
+    if (typeof w !== 'number' || !(w > 0)) throw invalid('vote_weights values must be positive numbers');
+  }
+  s.vote_weights = { ...base.vote_weights, ...weights };
   if (!MODES.includes(s.mode)) throw invalid(`mode must be one of ${MODES.join(', ')}`);
   if (!(s.consensus_approval_threshold > 0 && s.consensus_approval_threshold <= 1)) throw invalid('consensus_approval_threshold must be in (0, 1]');
   if (!Number.isInteger(s.consensus_min_votes) || s.consensus_min_votes < 1) throw invalid('consensus_min_votes must be a positive integer');
