@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "description": "Immutable decision log with approval workflows, voting, follow-ups and audit trail",
   "type": "module",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "test": "node --test \"test/*.test.js\"",
     "start": "node src/server.js"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "optionalDependencies": {
+    "pg": "^8.23.1"
+  }
 }

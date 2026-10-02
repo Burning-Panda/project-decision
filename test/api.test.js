@@ -228,3 +228,22 @@ test('notification profile endpoints', async () => {
   assert.equal((await call('GET', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.org })).json.profile.phone, '+14155550123');
   assert.equal((await call('PUT', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.bob, body: { phone: null } })).status, 403);
 });
+
+test('NUL characters are rejected at the boundary (they cannot be stored in PostgreSQL jsonb)', async () => {
+  const res = await fetch(`${base}/decisions`, { method: 'POST', headers: { 'x-user': U.alice, 'content-type': 'application/json' }, body: '{"project":"PRJ","title":"bad\\u0000title"}' });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, 'INVALID_JSON');
+});
+
+test('a failing persistence hook turns into a 500 without leaking details', async () => {
+  const { log: l3 } = setup();
+  const s3 = createApp(l3, { onMutation: async () => { throw new Error('connection to db-prod-7.internal:5432 refused'); } });
+  await new Promise((r) => s3.listen(0, '127.0.0.1', r));
+  try {
+    const res = await fetch(`http://127.0.0.1:${s3.address().port}/decisions`, { method: 'POST', headers: { 'x-user': U.alice, 'content-type': 'application/json' }, body: JSON.stringify({ project: 'PRJ', title: 'x' }) });
+    assert.equal(res.status, 500);
+    const body = await res.json();
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(JSON.stringify(body).includes('db-prod-7'), false);
+  } finally { await new Promise((r) => s3.close(r)); }
+});
