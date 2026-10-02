@@ -14,7 +14,7 @@ export const isValidEventPattern = (p) => p === '*' || EVENT_TYPES.includes(p) |
 export const matchesEvent = (patterns, type) => patterns.some((p) => p === '*' || p === type || (p.endsWith('.*') && type.startsWith(p.slice(0, -1))));
 
 export const MAX_ATTEMPTS = 5;
-const BACKOFF_SECONDS = [60, 300, 1800, 7200]; // delay after the 1st..4th failure
+export const BACKOFF_SECONDS = [60, 300, 1800, 7200]; // delay after the 1st..4th failure
 
 const sign = (secret, timestamp, body) => createHmac('sha256', secret).update(`${timestamp}.${body}`).digest('hex');
 

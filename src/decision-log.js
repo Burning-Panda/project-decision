@@ -10,7 +10,7 @@ import { EVENT_TYPES, isValidEventPattern, matchesEvent } from './webhooks.js';
 import { validateWebhookUrl } from './net.js';
 import { randomBytes } from 'node:crypto';
 import { SecretBox } from './secrets.js';
-import { sha256, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
+import { sha256, isValidEmail, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
 
 export { MemoryStore, DecisionLogError };
 
@@ -114,7 +114,7 @@ export class DecisionLog {
 
   _notify(user, type, decisionId, message) {
     this.store.notifications.push({
-      id: `notif-${pad(this.store.next('notification'))}`, user, type, decision_id: decisionId, message, created_at: this._now(), read: false,
+      id: `notif-${pad(this.store.next('notification'))}`, user, type, decision_id: decisionId, message, created_at: this._now(), read: false, planned: false,
     });
   }
 
@@ -825,6 +825,89 @@ export class DecisionLog {
     c.resolved = !!resolved;
     this._audit(actor, resolved ? 'resolve_comment' : 'reopen_comment', id, null, { comment_id: c.id });
     return this._commentView(c);
+  }
+
+  // ------------------------------------------------------------------ profiles & notification preferences
+  _defaultPreferences() {
+    return { channels: { email: true, sms: false, push: false }, order: ['email', 'sms', 'push'], mode: 'all', muted_types: [] };
+  }
+
+  /** Resolved profile (defaults applied) for any user id; never throws and never exposes anything to callers by itself. */
+  _profileOf(user) {
+    const p = this.store.profiles.get(user);
+    const defaults = this._defaultPreferences();
+    return {
+      user,
+      email: p?.email ?? (isValidEmail(user) ? user : null),
+      phone: p?.phone ?? null,
+      push_tokens: [...(p?.push_tokens ?? [])],
+      preferences: {
+        channels: { ...defaults.channels, ...(p?.preferences?.channels ?? {}) },
+        order: [...(p?.preferences?.order ?? defaults.order)],
+        mode: p?.preferences?.mode ?? defaults.mode,
+        muted_types: [...(p?.preferences?.muted_types ?? [])],
+      },
+    };
+  }
+
+  _requireProfileAccess(user, actor) {
+    if (actor === user) return;
+    const org = this.store.owners.has(actor)
+      && [...this.store.teams.values()].some((t) => t.owner === actor && t.members.some((m) => m.user === user));
+    if (!org) throw forbidden('You can only view or edit your own notification profile');
+  }
+
+  getProfile(user, actor) {
+    this._requireProfileAccess(user, actor);
+    return this._profileOf(user);
+  }
+
+  setProfile(user, actor, input = {}) {
+    this._requireProfileAccess(user, actor);
+    const next = this.store.profiles.get(user) ?? { user, email: null, phone: null, push_tokens: [], preferences: {} };
+    const known = ['email', 'sms', 'push'];
+    if ('email' in input) {
+      if (input.email !== null && !isValidEmail(input.email)) throw invalid('email is not a valid address');
+      next.email = input.email;
+    }
+    if ('phone' in input) {
+      if (input.phone !== null && !(typeof input.phone === 'string' && /^\+[1-9]\d{6,14}$/.test(input.phone))) throw invalid('phone must be E.164, e.g. +14155550123');
+      next.phone = input.phone;
+    }
+    if ('push_tokens' in input) {
+      const t = input.push_tokens;
+      if (!Array.isArray(t) || t.length > 10 || !t.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 512)) throw invalid('push_tokens must be a list of up to 10 non-empty strings');
+      next.push_tokens = [...new Set(t)];
+    }
+    if ('preferences' in input) {
+      const pr = input.preferences ?? {};
+      const prefs = { ...next.preferences };
+      if ('channels' in pr) {
+        if (typeof pr.channels !== 'object' || pr.channels === null) throw invalid('preferences.channels must be an object');
+        for (const [k, v] of Object.entries(pr.channels)) {
+          if (!known.includes(k)) throw invalid(`unknown channel "${k}" (expected ${known.join(', ')})`);
+          if (typeof v !== 'boolean') throw invalid(`preferences.channels.${k} must be true or false`);
+        }
+        prefs.channels = { ...(prefs.channels ?? {}), ...pr.channels };
+      }
+      if ('order' in pr) {
+        if (!Array.isArray(pr.order) || !pr.order.every((c) => known.includes(c)) || new Set(pr.order).size !== pr.order.length) throw invalid(`preferences.order must be a list of unique channels from ${known.join(', ')}`);
+        prefs.order = pr.order;
+      }
+      if ('mode' in pr) {
+        if (!['all', 'fallback'].includes(pr.mode)) throw invalid('preferences.mode must be "all" or "fallback"');
+        prefs.mode = pr.mode;
+      }
+      if ('muted_types' in pr) {
+        if (!Array.isArray(pr.muted_types) || pr.muted_types.length > 50 || !pr.muted_types.every((x) => typeof x === 'string' && x.length <= 100)) throw invalid('preferences.muted_types must be a list of notification type names');
+        prefs.muted_types = pr.muted_types;
+      }
+      next.preferences = prefs;
+    }
+    next.updated_at = this._now();
+    this.store.profiles.set(user, next);
+    this._audit(actor, 'update_profile', null, null, { user, fields: Object.keys(input) });
+    return this._profileOf(user);
   }
 
   // ------------------------------------------------------------------ participants & notifications

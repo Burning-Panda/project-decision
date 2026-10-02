@@ -118,6 +118,7 @@ test('profiles default sensibly: email derives from the user id, email is the on
   assert.equal(p.phone, null);
   assert.deepEqual(p.push_tokens, []);
   assert.deepEqual(p.preferences, { channels: { email: true, sms: false, push: false }, order: ['email', 'sms', 'push'], mode: 'all', muted_types: [] });
+  log.addTeamMember({ owner: 'acme', user: 'acme-bot', actor: 'acme' });
   assert.equal(log.getProfile('acme-bot', 'acme').email, null, 'ids that are not addresses have no email');
 });
 

@@ -7,6 +7,9 @@ export const dateOf = (iso) => iso.slice(0, 10);
 export const isDateString = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 export const isNonEmpty = (s) => typeof s === 'string' && s.trim().length > 0;
 
+// Deliberately strict: no whitespace, quotes, angle brackets or control characters (header-injection safe).
+export const isValidEmail = (s) => typeof s === 'string' && s.length <= 254 && /^[^\s<>@,;:"()[\]\\]+@[^\s<>@,;:"()[\]\\]+\.[^\s<>@,;:"()[\]\\]+$/.test(s);
+
 export function hms(totalSeconds) {
   const s = Math.max(0, Math.floor(totalSeconds));
   return [Math.floor(s / 3600), Math.floor((s % 3600) / 60), s % 60].map((n) => pad(n, 2)).join(':');
