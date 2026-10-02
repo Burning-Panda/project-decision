@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { DecisionLog } from '../src/decision-log.js';
 
+import { randomBytes } from 'node:crypto';
+import { SecretBox } from '../src/secrets.js';
+
+/** A fresh random-key SecretBox for tests that use persistent stores. */
+export const testBox = () => new SecretBox({ keys: [randomBytes(32)] });
+
 export function makeClock(start = '2024-03-20T10:00:00Z') {
   let t = Date.parse(start);
   return {
@@ -51,8 +57,11 @@ Move to PostgreSQL 16 within 90 days, maintain MySQL fallback for 30 days
 - Database replication overhead (mitigated by 30-day dual-write period)
 `;
 
-/** Builds a log with one org, default team and project PRJ. */
-export function setup({ settings, startAt, finder, threshold } = {}) {
+/**
+ * Builds a log with one org, default team and project PRJ.
+ * Options startAt/finder/threshold configure the log; every other key is an approval setting.
+ */
+export function setup({ startAt, finder, threshold, ...settings } = {}) {
   const clock = makeClock(startAt);
   const log = new DecisionLog({ clock: clock.now, relatedFinder: finder, relatedThreshold: threshold });
   log.createOwner({ identifier: 'acme', name: 'Acme Inc', email: 'root@acme.com' });
@@ -62,7 +71,7 @@ export function setup({ settings, startAt, finder, threshold } = {}) {
   log.addTeamMember({ owner: 'acme', team: 'default', user: U.lead, role: 'lead', actor: U.org });
   log.createProject({
     owner: 'acme', team: 'default', identifier: 'PRJ', title: 'Platform',
-    description: 'Platform decisions', settings: settings ? { approval_settings: settings } : undefined,
+    description: 'Platform decisions', settings: Object.keys(settings).length ? { approval_settings: settings } : undefined,
     actor: U.org,
   });
   return { log, clock };

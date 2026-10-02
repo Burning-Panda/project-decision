@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DecisionLog, MemoryStore } from '../src/decision-log.js';
+import { createHash } from 'node:crypto';
 import { setup, draft, proposed, act, assertCode, U } from './helpers.js';
+const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 test('outsiders cannot read anything; the org identifier can read everything', () => {
   const { log } = setup();
@@ -101,4 +103,42 @@ test('state survives a JSON round trip including id counters and audit chain', (
   assert.equal(restored.verifyAuditChain().ok, true);
   assert.equal(restored.verifyIntegrity(id).ok, true);
   assert.equal(restored.createDecision({ project: 'PRJ', actor: U.alice, title: 'next' }).id, 'PRJ-002');
+});
+
+test('audit hashes do not depend on object key order (stores such as jsonb reorder keys)', () => {
+  const { log } = setup();
+  const d = draft(log);
+  act(log, d.id, U.alice, 'propose');
+  assert.ok(log.store.audit.every((e) => e.hv === 2), 'new entries carry the hash version');
+  log.store.audit = log.store.audit.map((e) => Object.fromEntries(Object.entries(e).sort(([a], [b]) => (a < b ? 1 : -1)))); // reverse key order
+  assert.equal(log.verifyAuditChain().ok, true);
+  log.store.audit[0].actor = 'mallory@evil.com';
+  assert.equal(log.verifyAuditChain().ok, false, 'still tamper-evident');
+});
+
+test('chains written before hash versioning (insertion-order hashes) still verify', () => {
+  const { log } = setup();
+  log.store.audit.length = 0;
+  let prev = '0'.repeat(64);
+  for (let seq = 1; seq <= 3; seq++) {
+    const e = { seq, at: '2024-01-01T00:00:00.000Z', actor: 'a', action: 'create', decision_id: null, before: null, after: null, ip: null, detail: null, prev_hash: prev };
+    e.hash = sha256(JSON.stringify(e));
+    prev = e.hash;
+    log.store.audit.push(e);
+  }
+  assert.deepEqual(log.verifyAuditChain(), { ok: true, broken_at: null });
+  log.store.audit[1].actor = 'mallory';
+  assert.deepEqual(log.verifyAuditChain(), { ok: false, broken_at: 2 });
+});
+
+test('new entries can extend a legacy chain', () => {
+  const { log } = setup();
+  log.store.audit.length = 0;
+  const e = { seq: 1, at: '2024-01-01T00:00:00.000Z', actor: 'a', action: 'create', decision_id: null, before: null, after: null, ip: null, detail: null, prev_hash: '0'.repeat(64) };
+  e.hash = sha256(JSON.stringify(e));
+  log.store.audit.push(e);
+  log.createOwner({ identifier: 'newco' });
+  assert.equal(log.store.audit.at(-1).hv, 2);
+  assert.equal(log.store.audit.at(-1).prev_hash, e.hash);
+  assert.equal(log.verifyAuditChain().ok, true);
 });

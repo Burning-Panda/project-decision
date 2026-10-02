@@ -149,3 +149,101 @@ test('admin endpoints create projects and members', async () => {
   assert.equal(p.json.project.approval_settings.mode, 'veto');
   assert.equal((await call('POST', '/projects', { user: U.bob, body: { owner: 'acme', identifier: 'X', title: 'x' } })).status, 403);
 });
+
+test('serves the web UI without authentication, whitelisted files only', async () => {
+  const html = await fetch(`${base}/`);
+  assert.equal(html.status, 200);
+  assert.match(html.headers.get('content-type'), /text\/html/);
+  assert.match(await html.text(), /Decision Log/);
+  const js = await fetch(`${base}/app.js`);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('content-type'), /javascript/);
+  const css = await fetch(`${base}/style.css`);
+  assert.match(css.headers.get('content-type'), /text\/css/);
+  assert.equal((await fetch(`${base}/favicon.ico`)).status, 204);
+  const sneaky = await fetch(`${base}/..%2Fpackage.json`);
+  assert.equal(sneaky.status, 404, 'not whitelisted, so it is an unknown route');
+  assert.equal((await fetch(`${base}/index.html`)).status, 404);
+});
+
+test('UI script only uses endpoints the API actually serves', async () => {
+  const js = await (await fetch(`${base}/app.js`)).text();
+  const used = [...js.matchAll(/api\(['"`](?:GET|POST|PATCH)?['"`]?,?\s*['"`](\/[a-z]+)/g)].map((m) => m[1]);
+  assert.ok(used.length > 0);
+  for (const path of new Set(used)) {
+    const r = await call('GET', path, { user: U.alice });
+    assert.notEqual(r.json?.error?.code, 'NOT_FOUND', `${path} is not routed`);
+  }
+});
+
+test('onMutation fires after successful writes only', async () => {
+  const { log: l2 } = setup();
+  let calls = 0;
+  const s2 = createApp(l2, { onMutation: () => { calls++; } });
+  await new Promise((r) => s2.listen(0, '127.0.0.1', r));
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  const post = (body, user = U.alice) => fetch(`${b2}/decisions`, { method: 'POST', headers: { 'x-user': user, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await fetch(`${b2}/decisions`, { headers: { 'x-user': U.alice } })).status, 200);
+  assert.equal((await post({ project: 'PRJ' })).status, 400);
+  assert.equal(calls, 0);
+  assert.equal((await post({ project: 'PRJ', title: 'x' })).status, 201);
+  assert.equal(calls, 1);
+  await new Promise((r) => s2.close(r));
+});
+
+test('webhook management endpoints', async () => {
+  const body = { owner: 'acme', url: 'https://hooks.example.com/x', events: ['decision.*'] };
+  assert.equal((await call('POST', '/webhooks', { user: U.bob, body })).status, 403);
+  assert.equal((await call('POST', '/webhooks', { user: U.org, body: { ...body, url: 'http://127.0.0.1/x' } })).status, 400);
+  const created = await call('POST', '/webhooks', { user: U.org, body });
+  assert.equal(created.status, 201);
+  assert.match(created.json.webhook.secret, /^whsec_/);
+  const id = created.json.webhook.id;
+
+  const list = await call('GET', '/webhooks?owner=acme', { user: U.org });
+  assert.equal(list.json.webhooks.length, 1);
+  assert.equal('secret' in list.json.webhooks[0], false);
+  assert.equal((await call('GET', '/webhooks?owner=acme', { user: U.bob })).status, 403);
+
+  await call('POST', '/decisions', { user: U.alice, body: { project: 'PRJ', title: 'fires a webhook' } });
+  const deliveries = await call('GET', `/webhooks/${id}/deliveries`, { user: U.org });
+  assert.equal(deliveries.json.items[0].event_type, 'decision.created');
+  assert.equal((await call('POST', `/deliveries/${deliveries.json.items[0].id}/redeliver`, { user: U.org })).status, 200);
+
+  assert.equal((await call('DELETE', `/webhooks/${id}`, { user: U.org })).status, 200);
+  assert.equal((await call('GET', '/webhooks?owner=acme', { user: U.org })).json.webhooks.length, 0);
+});
+
+test('notification profile endpoints', async () => {
+  const get = await call('GET', '/profile', { user: U.david });
+  assert.equal(get.status, 200);
+  assert.equal(get.json.profile.email, U.david);
+  assert.equal(get.json.profile.preferences.channels.email, true);
+  const put = await call('PUT', '/profile', { user: U.david, body: { phone: '+14155550123', preferences: { channels: { sms: true }, muted_types: ['mention'] } } });
+  assert.equal(put.status, 200);
+  assert.equal(put.json.profile.phone, '+14155550123');
+  assert.equal(put.json.profile.preferences.channels.sms, true);
+  assert.equal((await call('PUT', '/profile', { user: U.david, body: { phone: 'nope' } })).status, 400);
+  assert.equal((await call('GET', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.carol })).status, 403);
+  assert.equal((await call('GET', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.org })).json.profile.phone, '+14155550123');
+  assert.equal((await call('PUT', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.bob, body: { phone: null } })).status, 403);
+});
+
+test('NUL characters are rejected at the boundary (they cannot be stored in PostgreSQL jsonb)', async () => {
+  const res = await fetch(`${base}/decisions`, { method: 'POST', headers: { 'x-user': U.alice, 'content-type': 'application/json' }, body: '{"project":"PRJ","title":"bad\\u0000title"}' });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error.code, 'INVALID_JSON');
+});
+
+test('a failing persistence hook turns into a 500 without leaking details', async () => {
+  const { log: l3 } = setup();
+  const s3 = createApp(l3, { onMutation: async () => { throw new Error('connection to db-prod-7.internal:5432 refused'); } });
+  await new Promise((r) => s3.listen(0, '127.0.0.1', r));
+  try {
+    const res = await fetch(`http://127.0.0.1:${s3.address().port}/decisions`, { method: 'POST', headers: { 'x-user': U.alice, 'content-type': 'application/json' }, body: JSON.stringify({ project: 'PRJ', title: 'x' }) });
+    assert.equal(res.status, 500);
+    const body = await res.json();
+    assert.equal(body.error.code, 'INTERNAL_ERROR');
+    assert.equal(JSON.stringify(body).includes('db-prod-7'), false);
+  } finally { await new Promise((r) => s3.close(r)); }
+});
