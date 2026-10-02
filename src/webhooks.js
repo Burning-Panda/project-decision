@@ -84,6 +84,8 @@ export class WebhookDispatcher {
     try { addresses = net.isIP(host) ? [host] : await this.resolve(host); } catch (e) { return fail(`dns: ${e.message}`); }
     if (!this.allowPrivateTargets && (!addresses.length || addresses.some(isPrivateAddress))) return fail('blocked_target', null, false);
 
+    let secret;
+    try { secret = this.log.webhookSecret(hook); } catch { return fail('secret_unavailable', null, false); }
     const body = JSON.stringify(event.payload);
     const timestamp = String(Math.floor(now.getTime() / 1000));
     try {
@@ -98,7 +100,7 @@ export class WebhookDispatcher {
           'x-decision-log-event': event.type,
           'x-decision-log-delivery': delivery.id,
           'x-decision-log-timestamp': timestamp,
-          'x-decision-log-signature': `sha256=${sign(hook.secret, timestamp, body)}`,
+          'x-decision-log-signature': `sha256=${sign(secret, timestamp, body)}`,
         },
       });
       if (res.status >= 200 && res.status < 300) {

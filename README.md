@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 22.13).
 
 ```
-npm test                       # 117 tests (node:test)
+npm test                       # 125 tests (node:test)
 PORT=3000 npm start                      # in-memory
 PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite (recommended)
 PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
@@ -45,8 +45,7 @@ PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 ## Webhooks
 
 Org admins register endpoints with `POST /webhooks {owner, url, events}` (events: `*`, a family such as
-`decision.*`, or exact names). The signing secret is returned **once**; it is stored in plaintext at rest, so
-protect the database file. Events: `decision.created|proposed|vote_received|approved|declined|revision_requested|returned_to_draft|superseded`,
+`decision.*`, or exact names). The signing secret is returned **once** and stored encrypted (see *Secrets at rest*). Events: `decision.created|proposed|vote_received|approved|declined|revision_requested|returned_to_draft|superseded`,
 `comment.created`, `followup.assigned|completed`, `meeting.recorded`. Payloads carry ids and metadata, never document or comment bodies.
 
 - **Outbox**: events and delivery rows are written in the same commit as the change, so nothing is lost on a crash.
@@ -59,6 +58,21 @@ protect the database file. Events: `decision.created|proposed|vote_received|appr
   delivery after DNS resolution. Set `WEBHOOK_ALLOW_PRIVATE=1` only for local development. DNS is resolved
   separately from the request, so use an egress proxy/firewall if rebinding is in your threat model.
 - Endpoints: `GET /webhooks?owner=`, `DELETE /webhooks/:id`, `GET /webhooks/:id/deliveries?status=`.
+
+## Secrets at rest
+
+Webhook signing secrets are encrypted with AES-256-GCM (`src/secrets.js`) and bound to their record id, so a
+ciphertext copied to another record will not decrypt. When data is persisted (`DATABASE_FILE` or `DATA_FILE`) the server
+**refuses to start without `SECRETS_KEY`** (32 bytes, base64 or hex):
+
+```
+export SECRETS_KEY=$(node -e "console.log(require('crypto').randomBytes(32).toString('base64'))")
+```
+
+Rotate by setting the new key as `SECRETS_KEY` and the old one(s) in `SECRETS_KEY_PREVIOUS` (comma separated); on
+startup everything is re-encrypted under the new key and the old one can then be dropped. Plaintext secrets written
+by earlier versions are encrypted automatically on first start. Losing the key makes stored secrets unrecoverable
+(re-create the webhooks). The key itself must live in your secret manager, not in the database.
 
 ## Not built yet
 

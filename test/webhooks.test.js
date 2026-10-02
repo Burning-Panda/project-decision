@@ -6,7 +6,7 @@ import path from 'node:path';
 import { WebhookDispatcher, verifySignature } from '../src/webhooks.js';
 import { SqliteStore } from '../src/sqlite-store.js';
 import { DecisionLog } from '../src/decision-log.js';
-import { setup, draft, proposed, act, assertCode, makeClock, U } from './helpers.js';
+import { setup, draft, proposed, act, assertCode, makeClock, testBox, U } from './helpers.js';
 
 const URL_OK = 'https://hooks.example.com/dl';
 const PUBLIC = async () => ['93.184.216.34'];
@@ -298,7 +298,8 @@ test('webhooks, events and deliveries survive a SQLite round trip', () => {
     const file = path.join(dir, 'x.db');
     const s1 = SqliteStore.open(file);
     const clock = makeClock();
-    const log = new DecisionLog({ store: s1, clock: clock.now });
+    const box = testBox();
+    const log = new DecisionLog({ store: s1, clock: clock.now, secretBox: box });
     log.createOwner({ identifier: 'acme' });
     log.addTeamMember({ owner: 'acme', user: U.alice, actor: 'acme' });
     log.createProject({ owner: 'acme', identifier: 'PRJ', title: 'P', actor: 'acme' });
@@ -308,7 +309,7 @@ test('webhooks, events and deliveries survive a SQLite round trip', () => {
     s1.close();
 
     const s2 = SqliteStore.open(file);
-    const again = new DecisionLog({ store: s2, clock: clock.now });
+    const again = new DecisionLog({ store: s2, clock: clock.now, secretBox: box });
     assert.equal(again.listWebhooks('acme', 'acme').length, 1);
     assert.equal(again.listDeliveries(hook.id, 'acme').total, 1);
     again.createDecision({ project: 'PRJ', actor: U.alice, title: 'y' });

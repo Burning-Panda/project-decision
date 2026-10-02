@@ -10,6 +10,8 @@ const RECORDS = ['idempotency', 'counters'];
  * writes only the rows that changed, in one transaction. Requires Node >= 22.13 (node:sqlite).
  */
 export class SqliteStore extends MemoryStore {
+  persistent = true;
+
   static open(file) {
     const db = new DatabaseSync(file);
     db.exec('PRAGMA journal_mode = WAL');

@@ -5,16 +5,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { DecisionLog } from '../src/decision-log.js';
 import { SqliteStore } from '../src/sqlite-store.js';
-import { makeClock, U, CONTENT_V1, act } from './helpers.js';
+import { makeClock, U, CONTENT_V1, act, testBox } from './helpers.js';
 
 function tmpDb() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dl-'));
   return { file: path.join(dir, 'log.db'), cleanup: () => fs.rmSync(dir, { recursive: true, force: true }) };
 }
 
+const box = testBox();
 function build(store) {
   const clock = makeClock();
-  const log = new DecisionLog({ store, clock: clock.now });
+  const log = new DecisionLog({ store, clock: clock.now, secretBox: box });
   return { log, clock };
 }
 

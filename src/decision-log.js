@@ -9,6 +9,7 @@ import * as queries from './queries.js';
 import { EVENT_TYPES, isValidEventPattern, matchesEvent } from './webhooks.js';
 import { validateWebhookUrl } from './net.js';
 import { randomBytes } from 'node:crypto';
+import { SecretBox } from './secrets.js';
 import { sha256, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
 
 export { MemoryStore, DecisionLogError };
@@ -23,13 +24,16 @@ const GENESIS = '0'.repeat(64);
 const ALL_STATES = ['draft', 'proposed', 'declined', 'approved'];
 
 export class DecisionLog {
-  constructor({ clock = () => new Date(), store = new MemoryStore(), relatedFinder = lexicalFinder, relatedThreshold = 60, allowPrivateWebhookTargets = false } = {}) {
+  constructor({ clock = () => new Date(), store = new MemoryStore(), relatedFinder = lexicalFinder, relatedThreshold = 60, allowPrivateWebhookTargets = false, secretBox } = {}) {
+    if (!secretBox && store.persistent) throw new Error('A persistent store requires a secretBox (configure SECRETS_KEY)');
+    this.secretBox = secretBox ?? SecretBox.generate();
     this.allowPrivateTargets = allowPrivateWebhookTargets;
     this.clock = clock;
     this.store = store;
     this.finder = relatedFinder ?? lexicalFinder;
     this.threshold = relatedThreshold ?? 60;
     this.actions = this._defineActions();
+    this.migrateSecrets();
   }
 
   // ------------------------------------------------------------------ helpers
@@ -144,9 +148,34 @@ export class DecisionLog {
     return { deliveries: before.deliveries - this.store.deliveries.length, events: before.events - this.store.events.length };
   }
 
-  _webhookView(h, withSecret = false) {
-    const { secret, ...rest } = clone(h);
-    return withSecret ? { ...rest, secret } : rest;
+  _webhookView(h) {
+    const { secret, secret_enc, ...rest } = clone(h);
+    return rest;
+  }
+
+  webhookSecret(hook) { return this.secretBox.decrypt(hook.secret_enc, hook.id); }
+
+  /** Encrypts any plaintext webhook secret left by older versions. Returns how many were converted. */
+  migrateSecrets() {
+    let migrated = 0;
+    for (const h of this.store.webhooks) {
+      if (typeof h.secret !== 'string') continue;
+      h.secret_enc = SecretBox.isEncrypted(h.secret) ? h.secret : this.secretBox.encrypt(h.secret, h.id);
+      delete h.secret;
+      migrated++;
+    }
+    return migrated;
+  }
+
+  /** Re-encrypts secrets that are not under the current key (after adding a new SECRETS_KEY). */
+  rotateSecrets() {
+    let rotated = 0;
+    for (const h of this.store.webhooks) {
+      if (!this.secretBox.needsRotation(h.secret_enc)) continue;
+      h.secret_enc = this.secretBox.encrypt(this.webhookSecret(h), h.id);
+      rotated++;
+    }
+    return { rotated };
   }
 
   _webhook(id, actor) {
@@ -165,13 +194,15 @@ export class DecisionLog {
     if (!Array.isArray(patterns) || !patterns.length || !patterns.every((p) => typeof p === 'string' && isValidEventPattern(p))) {
       throw invalid(`events must be a non-empty list of "*", "<family>.*" or one of: ${EVENT_TYPES.join(', ')}`);
     }
+    const id = `webhook-${pad(this.store.next('webhook'))}`;
+    const secret = `whsec_${randomBytes(24).toString('hex')}`;
     const hook = {
-      id: `webhook-${pad(this.store.next('webhook'))}`, owner, url: href, events: [...new Set(patterns)],
-      secret: `whsec_${randomBytes(24).toString('hex')}`, active: true, created_by: actor, created_at: this._now(), deleted_at: null,
+      id, owner, url: href, events: [...new Set(patterns)],
+      secret_enc: this.secretBox.encrypt(secret, id), active: true, created_by: actor, created_at: this._now(), deleted_at: null,
     };
     this.store.webhooks.push(hook);
     this._audit(actor, 'create_webhook', null, null, { webhook_id: hook.id, url: hook.url });
-    return this._webhookView(hook, true);
+    return { ...this._webhookView(hook), secret };
   }
 
   listWebhooks(owner, actor) {

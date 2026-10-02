@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import { DecisionLog } from '../src/decision-log.js';
 
+import { randomBytes } from 'node:crypto';
+import { SecretBox } from '../src/secrets.js';
+
+/** A fresh random-key SecretBox for tests that use persistent stores. */
+export const testBox = () => new SecretBox({ keys: [randomBytes(32)] });
+
 export function makeClock(start = '2024-03-20T10:00:00Z') {
   let t = Date.parse(start);
   return {

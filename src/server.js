@@ -2,11 +2,20 @@ import fs from 'node:fs';
 import { DecisionLog, MemoryStore } from './decision-log.js';
 import { createApp } from './api.js';
 import { WebhookDispatcher } from './webhooks.js';
+import { SecretBox } from './secrets.js';
 
 const port = Number(process.env.PORT ?? 3000);
 const dataFile = process.env.DATA_FILE;
 
 const dbFile = process.env.DATABASE_FILE;
+
+const secretBox = SecretBox.fromEnv();
+if ((dbFile || dataFile) && !secretBox) {
+  console.error('SECRETS_KEY is required when data is persisted (DATABASE_FILE / DATA_FILE).\n'
+    + "Generate one with: node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\"\n"
+    + 'To rotate, set the new key as SECRETS_KEY and keep the old one in SECRETS_KEY_PREVIOUS.');
+  process.exit(1);
+}
 
 let store = new MemoryStore();
 let save;
@@ -22,7 +31,15 @@ if (dbFile) {
   };
 }
 const allowPrivateTargets = process.env.WEBHOOK_ALLOW_PRIVATE === '1';
-const log = new DecisionLog({ store, allowPrivateWebhookTargets: allowPrivateTargets });
+store.persistent = Boolean(dbFile || dataFile);
+const log = new DecisionLog({ store, secretBox: secretBox ?? undefined, allowPrivateWebhookTargets: allowPrivateTargets });
+try {
+  if (log.rotateSecrets().rotated) console.log('re-encrypted secrets under the current SECRETS_KEY');
+} catch (e) {
+  console.error(`Cannot decrypt stored secrets with the configured keys (${e.message}).\nKeep every key that was ever used in SECRETS_KEY_PREVIOUS until secrets are rotated.`);
+  process.exit(1);
+}
+save?.(); // persist any migration/rotation done at startup
 const dispatcher = new WebhookDispatcher(log, { allowPrivateTargets });
 
 createApp(log, { onMutation: save }).listen(port, () => console.log(`decision-log listening on :${port}`));
