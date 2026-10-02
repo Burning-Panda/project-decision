@@ -79,6 +79,12 @@ export function createApp(log, { onMutation } = {}) {
   });
   route('PATCH', '/todos/:id', (c) => ok(200, { todo: log.updateTodo(c.params.id, c.actor, c.body) }));
 
+  route('POST', '/webhooks', (c) => ok(201, { webhook: log.createWebhook({ ...c.body, actor: c.actor }) }));
+  route('GET', '/webhooks', (c) => ok(200, { webhooks: log.listWebhooks(c.query.owner, c.actor) }));
+  route('DELETE', '/webhooks/:id', (c) => ok(200, { webhook: log.deleteWebhook(c.params.id, c.actor) }));
+  route('GET', '/webhooks/:id/deliveries', (c) => ok(200, log.listDeliveries(c.params.id, c.actor, c.query)));
+  route('POST', '/deliveries/:id/redeliver', (c) => ok(200, { delivery: log.redeliver(c.params.id, c.actor) }));
+
   route('GET', '/search', (c) => ok(200, log.search({ ...c.query, actor: c.actor })));
   route('GET', '/dashboard', (c) => ok(200, { dashboard: log.dashboard(c.actor) }));
   route('GET', '/notifications', (c) => ok(200, { notifications: log.listNotifications(c.actor) }));

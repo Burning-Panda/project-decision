@@ -6,6 +6,9 @@ import { diffMarkdown } from './diff.js';
 import { lexicalFinder, RELATIONSHIP_TYPES } from './related.js';
 import { DEFAULT_TEMPLATE } from './template.js';
 import * as queries from './queries.js';
+import { EVENT_TYPES, isValidEventPattern, matchesEvent } from './webhooks.js';
+import { validateWebhookUrl } from './net.js';
+import { randomBytes } from 'node:crypto';
 import { sha256, clone, pad, dateOf, isDateString, isNonEmpty, hms, clampInt } from './util.js';
 
 export { MemoryStore, DecisionLogError };
@@ -20,7 +23,8 @@ const GENESIS = '0'.repeat(64);
 const ALL_STATES = ['draft', 'proposed', 'declined', 'approved'];
 
 export class DecisionLog {
-  constructor({ clock = () => new Date(), store = new MemoryStore(), relatedFinder = lexicalFinder, relatedThreshold = 60 } = {}) {
+  constructor({ clock = () => new Date(), store = new MemoryStore(), relatedFinder = lexicalFinder, relatedThreshold = 60, allowPrivateWebhookTargets = false } = {}) {
+    this.allowPrivateTargets = allowPrivateWebhookTargets;
     this.clock = clock;
     this.store = store;
     this.finder = relatedFinder ?? lexicalFinder;
@@ -112,6 +116,97 @@ export class DecisionLog {
 
   _page({ limit, offset }) {
     return { limit: clampInt(limit, { min: 1, max: 100, def: 25 }), offset: clampInt(offset, { min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 }) };
+  }
+
+  // ------------------------------------------------------------------ events & webhooks
+  /** Records a domain event in the outbox and queues a delivery for every matching webhook (same commit as the change). */
+  _emit(type, d, data = {}) {
+    const now = this._now();
+    const id = `evt-${pad(this.store.next('event'))}`;
+    const payload = { id, event: type, decision_id: d.id, project: d.project, timestamp: now, ...data };
+    this.store.events.push({ id, type, decision_id: d.id, customer: d.customer, created_at: now, payload });
+    for (const hook of this.store.webhooks) {
+      if (hook.owner !== d.customer || !hook.active || !matchesEvent(hook.events, type)) continue;
+      this.store.deliveries.push({
+        id: `dlv-${pad(this.store.next('delivery'))}`, webhook_id: hook.id, event_id: id, status: 'pending', attempts: 0,
+        next_attempt_at: now, last_attempt_at: null, last_status: null, last_error: null, delivered_at: null, created_at: now,
+      });
+    }
+  }
+
+  /** Drops finished deliveries (delivered/failed/cancelled) and events nothing refers to, older than the cutoff. */
+  pruneOutbox({ olderThanDays = 30 } = {}) {
+    const cutoff = new Date(this.clock().getTime() - olderThanDays * 86_400_000).toISOString();
+    const before = { deliveries: this.store.deliveries.length, events: this.store.events.length };
+    this.store.deliveries = this.store.deliveries.filter((d) => d.status === 'pending' || d.created_at >= cutoff);
+    const referenced = new Set(this.store.deliveries.map((d) => d.event_id));
+    this.store.events = this.store.events.filter((e) => referenced.has(e.id) || e.created_at >= cutoff);
+    return { deliveries: before.deliveries - this.store.deliveries.length, events: before.events - this.store.events.length };
+  }
+
+  _webhookView(h, withSecret = false) {
+    const { secret, ...rest } = clone(h);
+    return withSecret ? { ...rest, secret } : rest;
+  }
+
+  _webhook(id, actor) {
+    const h = this.store.webhooks.find((x) => x.id === id && x.active);
+    if (!h) throw notFound(`Webhook ${id}`);
+    if (!this._isOrgAdmin(actor, h.owner)) throw forbidden('Only the owner can manage webhooks');
+    return h;
+  }
+
+  createWebhook({ owner, url, events, actor }) {
+    this._owner(owner);
+    if (!this._isOrgAdmin(actor, owner)) throw forbidden('Only the owner can manage webhooks');
+    let href;
+    try { href = validateWebhookUrl(url, this.allowPrivateTargets); } catch (e) { throw invalid(e.message); }
+    const patterns = events ?? ['*'];
+    if (!Array.isArray(patterns) || !patterns.length || !patterns.every((p) => typeof p === 'string' && isValidEventPattern(p))) {
+      throw invalid(`events must be a non-empty list of "*", "<family>.*" or one of: ${EVENT_TYPES.join(', ')}`);
+    }
+    const hook = {
+      id: `webhook-${pad(this.store.next('webhook'))}`, owner, url: href, events: [...new Set(patterns)],
+      secret: `whsec_${randomBytes(24).toString('hex')}`, active: true, created_by: actor, created_at: this._now(), deleted_at: null,
+    };
+    this.store.webhooks.push(hook);
+    this._audit(actor, 'create_webhook', null, null, { webhook_id: hook.id, url: hook.url });
+    return this._webhookView(hook, true);
+  }
+
+  listWebhooks(owner, actor) {
+    this._owner(owner);
+    if (!this._isOrgAdmin(actor, owner)) throw forbidden('Only the owner can manage webhooks');
+    return this.store.webhooks.filter((h) => h.owner === owner && h.active).map((h) => this._webhookView(h));
+  }
+
+  deleteWebhook(id, actor) {
+    const h = this._webhook(id, actor);
+    h.active = false;
+    h.deleted_at = this._now();
+    this._audit(actor, 'delete_webhook', null, null, { webhook_id: id });
+    return this._webhookView(h);
+  }
+
+  listDeliveries(webhookId, actor, { status, limit, offset } = {}) {
+    this._webhook(webhookId, actor);
+    const events = new Map(this.store.events.map((e) => [e.id, e]));
+    let items = this.store.deliveries.filter((d) => d.webhook_id === webhookId);
+    if (status) items = items.filter((d) => d.status === status);
+    const p = this._page({ limit, offset });
+    return {
+      items: items.slice(p.offset, p.offset + p.limit).map((d) => ({ ...clone(d), event_type: events.get(d.event_id)?.type, decision_id: events.get(d.event_id)?.decision_id })),
+      total: items.length, ...p,
+    };
+  }
+
+  redeliver(deliveryId, actor) {
+    const d = this.store.deliveries.find((x) => x.id === deliveryId);
+    if (!d) throw notFound(`Delivery ${deliveryId}`);
+    this._webhook(d.webhook_id, actor);
+    Object.assign(d, { status: 'pending', attempts: 0, next_attempt_at: this._now(), last_error: null, last_status: null, delivered_at: null });
+    this._audit(actor, 'redeliver', null, null, { delivery_id: d.id });
+    return clone(d);
   }
 
   // ------------------------------------------------------------------ org structure
@@ -219,6 +314,7 @@ export class DecisionLog {
     this.store.revisions.set(d.id, []);
     this._touch(d.id, actor, 'created', 'owner');
     this._audit(actor, 'create', d.id, null, { status: 'draft' });
+    this._emit('decision.created', d, { title: d.title, owner: d.owner });
     this._scanRelated(d);
     return clone(d);
   }
@@ -362,6 +458,7 @@ export class DecisionLog {
           d.approved_at = d.declined_at = null;
           d.approvers = [];
           this._touch(d.id, actor, 'proposed');
+          this._emit('decision.proposed', d, { revision: d.current_revision, proposed_by: actor });
           for (const m of this._teamOf(d).members) if (m.user !== actor) this._notify(m.user, 'decision_proposed', d.id, `${d.id} was proposed: ${d.title}`);
           this._scanRelated(d);
           return { message: `${d.id} proposed (revision ${d.current_revision})` };
@@ -401,6 +498,7 @@ export class DecisionLog {
           d.decline = { by: actor, reason: payload.reason, at: now };
           Object.assign(this._currentRevision(d), { outcome: 'declined', reason: payload.reason, requested_by: actor, requested_at: now });
           this._touch(d.id, actor, 'declined', 'decliner', { reason: payload.reason });
+          this._emit('decision.declined', d, { by: actor, reason: payload.reason });
           this._notify(d.owner, 'decision_declined', d.id, `${d.id} was declined: ${payload.reason}`);
           return { message: `${d.id} declined` };
         },
@@ -422,6 +520,7 @@ export class DecisionLog {
           d.immutable_from = null;
           d.updated_at = this._now();
           this._touch(d.id, actor, 'returned_to_draft');
+          this._emit('decision.returned_to_draft', d, { by: actor });
           return { message: `${d.id} returned to draft` };
         },
       },
@@ -481,9 +580,11 @@ export class DecisionLog {
       if (old) {
         old.is_superseded = true;
         old.superseded_by_id = d.id;
+        this._emit('decision.superseded', old, { superseded_by: d.id });
         this._audit(actor ?? 'system', 'superseded', old.id, { status: old.status }, { status: old.status }, { detail: { superseded_by: d.id } });
       }
     }
+    this._emit('decision.approved', d, { approvers: approvers.map((a) => a.user) });
     this._notify(d.owner, 'decision_approved', d.id, `${d.id} was approved`);
   }
 
@@ -497,6 +598,7 @@ export class DecisionLog {
     d.immutable_from = null;
     d.updated_at = now;
     this._touch(d.id, actor, 'requested_revision', 'reviewer', { reason });
+    this._emit('decision.revision_requested', d, { by: actor, reason: reason ?? null, revision: rev.revision_number });
     this._notify(d.owner, 'revision_requested', d.id, `${actor} requested a revision of ${d.id}: ${reason ?? ''}`);
     return {
       status_code: 201,
@@ -519,6 +621,7 @@ export class DecisionLog {
     if (existing) Object.assign(existing, { vote, comment, voted_at: now });
     else this.store.votes.push({ decision_id: d.id, revision: rev, voter: actor, vote, comment, voted_at: now });
     this._touch(d.id, actor, 'voted', vote === 'approve' ? 'approver' : vote === 'request_revision' ? 'reviewer' : null, { vote });
+    this._emit('decision.vote_received', d, { voter: actor, vote });
     if (settings.notification_on_vote) this._notify(d.owner, 'vote_received', d.id, `${actor} voted ${vote} on ${d.id}`);
 
     if (veto && vote === 'request_revision') return this._requestRevision(d, actor, comment, null, settings);
@@ -639,6 +742,7 @@ export class DecisionLog {
     this._touch(id, actor, 'commented', 'reviewer');
     for (const u of mentions) if (u !== actor) this._notify(u, 'mention', id, `${actor} mentioned you on ${id}`);
     this._audit(actor, 'add_comment', id, null, { comment_id: c.id });
+    this._emit('comment.created', d, { comment_id: c.id, user: actor });
     return this._commentView(c);
   }
 
@@ -733,6 +837,7 @@ export class DecisionLog {
     this._touch(id, actor, 'assigned_followup');
     this._notify(f.assigned_to, 'followup_assigned', id, `${actor} assigned you "${f.title}" on ${id}`);
     this._audit(actor, 'assign_followup', id, null, { followup_id: f.id });
+    this._emit('followup.assigned', d, { followup_id: f.id, assigned_to: f.assigned_to, assigned_by: actor });
     return this._todoView(f);
   }
 
@@ -777,6 +882,7 @@ export class DecisionLog {
     }
     if (notes !== undefined) f.assignee_notes = notes;
     f.updated_at = this._now();
+    if (status === 'completed' && before !== 'completed') this._emit('followup.completed', this._decision(f.decision_id), { followup_id: f.id, completed_by: actor });
     this._audit(actor, 'update_todo', f.decision_id, { status: before }, { status: f.status }, { detail: { followup_id: f.id } });
     return this._todoView(f);
   }
@@ -811,6 +917,7 @@ export class DecisionLog {
     this.store.meetings.push(m);
     this._touch(id, actor, 'recorded_meeting', 'contributor');
     this._audit(actor, 'add_meeting', id, null, { meeting_id: m.id });
+    this._emit('meeting.recorded', d, { meeting_id: m.id, recorded_by: actor });
     return clone(m);
   }
 

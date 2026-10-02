@@ -2,7 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { MemoryStore } from './store.js';
 
 const MAPS = ['owners', 'teams', 'projects', 'decisions', 'revisions'];
-const ARRAYS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications'];
+const ARRAYS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications', 'webhooks', 'events', 'deliveries'];
 const RECORDS = ['idempotency', 'counters'];
 
 /**

@@ -316,3 +316,55 @@ test('webhooks, events and deliveries survive a SQLite round trip', () => {
     s2.close();
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ---------------------------------------------------------------- end to end & housekeeping
+test('end to end over real HTTP: a local receiver verifies the signature', async () => {
+  const http = await import('node:http');
+  const received = [];
+  const receiver = http.createServer((req, res) => {
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
+    req.on('end', () => { received.push({ headers: req.headers, body: Buffer.concat(chunks).toString() }); res.writeHead(204); res.end(); });
+  });
+  await new Promise((r) => receiver.listen(0, '127.0.0.1', r));
+  try {
+    const { log, hook } = (() => {
+      const ctx = setup();
+      ctx.log.allowPrivateTargets = true;
+      const h = ctx.log.createWebhook({ owner: 'acme', url: `http://127.0.0.1:${receiver.address().port}/hook`, events: ['decision.created'], actor: U.org });
+      return { log: ctx.log, hook: h };
+    })();
+    draft(log);
+    const stats = await new WebhookDispatcher(log, { allowPrivateTargets: true }).run();
+    assert.equal(stats.delivered, 1);
+    assert.equal(received.length, 1);
+    const { headers, body } = received[0];
+    assert.equal(headers['x-decision-log-event'], 'decision.created');
+    assert.equal(JSON.parse(body).decision_id, 'PRJ-001');
+    assert.equal(verifySignature({ secret: hook.secret, timestamp: headers['x-decision-log-timestamp'], body, signature: headers['x-decision-log-signature'], now: log.clock() }), true);
+  } finally { await new Promise((r) => receiver.close(r)); }
+});
+
+test('default policy refuses a loopback receiver at delivery time', async () => {
+  const { log, hook } = hooked(undefined, ['decision.created']);
+  log.store.webhooks[0].url = 'http://127.0.0.1:9/hook'; // bypass creation-time validation, as if DNS changed later
+  draft(log);
+  const stats = await new WebhookDispatcher(log, { transport: () => assert.fail('must not send') }).run();
+  assert.equal(stats.failed, 1);
+  assert.equal(log.listDeliveries(hook.id, U.org).items[0].last_error, 'blocked_target');
+});
+
+test('pruneOutbox removes old finished deliveries and orphaned events, keeping pending ones', async () => {
+  const { log, clock } = hooked(undefined, ['decision.created']);
+  draft(log);
+  await dispatcherFor(log, recorder()).run();
+  clock.advanceDays(10);
+  draft(log, { title: 'recent, still pending' });
+  const removed = log.pruneOutbox({ olderThanDays: 7 });
+  assert.deepEqual(removed, { deliveries: 1, events: 1 });
+  assert.equal(log.store.deliveries.length, 1);
+  assert.equal(log.store.deliveries[0].status, 'pending');
+  assert.equal(log.store.events.length, 1);
+  clock.advanceDays(30);
+  assert.deepEqual(log.pruneOutbox({ olderThanDays: 7 }), { deliveries: 0, events: 0 }, 'pending deliveries are never pruned');
+});

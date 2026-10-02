@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 22.13).
 
 ```
-npm test                       # 95 tests (node:test)
+npm test                       # 117 tests (node:test)
 PORT=3000 npm start                      # in-memory
 PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite (recommended)
 PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
@@ -20,6 +20,7 @@ PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 | `src/voting.js`, `src/settings.js` | Approval-mode evaluation and project settings |
 | `src/diff.js`, `src/related.js`, `src/template.js` | Section-aware diff, pluggable related-decision finder, default template |
 | `src/store.js`, `src/sqlite-store.js` | In-memory store with JSON snapshots; SQLite store that commits changed rows transactionally |
+| `src/webhooks.js`, `src/net.js` | Webhook dispatcher (signing, retries, SSRF guard), `verifySignature` for receivers |
 | `public/` | Dependency-free web UI (list, detail, actions, comments, todos, dashboard) served at `/` |
 | `src/api.js`, `src/server.js` | HTTP API (`POST /decisions/:id/actions` etc.) and entrypoint |
 
@@ -41,7 +42,25 @@ PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
   embedding-based `relatedFinder(decision, candidates) => [{decision_id, type, score}]` to replace it.
   Scanning runs on create, draft save and propose. Links are shown from both sides (`direction`), explicit ids like `PRJ-012` in a document are linked automatically, and the owner of the linked decision is notified. The finder is synchronous.
 
+## Webhooks
+
+Org admins register endpoints with `POST /webhooks {owner, url, events}` (events: `*`, a family such as
+`decision.*`, or exact names). The signing secret is returned **once**; it is stored in plaintext at rest, so
+protect the database file. Events: `decision.created|proposed|vote_received|approved|declined|revision_requested|returned_to_draft|superseded`,
+`comment.created`, `followup.assigned|completed`, `meeting.recorded`. Payloads carry ids and metadata, never document or comment bodies.
+
+- **Outbox**: events and delivery rows are written in the same commit as the change, so nothing is lost on a crash.
+  The server sends them every 5s and prunes finished ones after 30 days.
+- **Delivery**: `POST` JSON with `X-Decision-Log-Event`, `-Delivery` (stable across retries; use it to de-duplicate),
+  `-Timestamp` and `-Signature: sha256=<HMAC-SHA256 of "<timestamp>.<body>">`. Any 2xx is success. Failures retry
+  after 1m, 5m, 30m, 2h, then are marked `failed` (5 attempts); redeliver with `POST /deliveries/:id/redeliver`.
+  Redirects are never followed. Receivers should use `verifySignature` (5 minute replay window).
+- **SSRF**: private, loopback, link-local and internal-looking targets are rejected at registration and again at
+  delivery after DNS resolution. Set `WEBHOOK_ALLOW_PRIVATE=1` only for local development. DNS is resolved
+  separately from the request, so use an egress proxy/firewall if rebinding is in your threat model.
+- Endpoints: `GET /webhooks?owner=`, `DELETE /webhooks/:id`, `GET /webhooks/:id/deliveries?status=`.
+
 ## Not built yet
 
 Postgres storage/migrations (SQLite is the durable option for now), browser audio recording and the speech-to-text call (the service accepts
-a finished transcript via `add_meeting`), webhooks/email.
+a finished transcript via `add_meeting`), email notifications.
