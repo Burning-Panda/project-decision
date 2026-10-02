@@ -844,21 +844,33 @@ export class DecisionLog {
 
   _scanRelated(d) {
     const candidates = [...this.store.decisions.values()].filter((c) => c.customer === d.customer && c.id !== d.id);
+    const link = (target, attrs) => {
+      if (this.store.relationships.some((x) => x.decision_id === d.id && x.related_decision_id === target.id)) return;
+      this._upsertRelationship(d.id, target.id, { by: null, status: 'suggested', ...attrs });
+      if (target.owner !== d.owner) this._notify(target.owner, 'related_decision', target.id, `${d.id} (${d.title}) relates to ${target.id}`);
+    };
+    // Explicit references such as "PRJ-012" inside the document.
+    for (const m of d.content.matchAll(/\b([A-Za-z][A-Za-z0-9]*-\d{3,})\b/g)) {
+      const target = this.store.decisions.get(m[1]);
+      if (target && target.id !== d.id && target.customer === d.customer) link(target, { type: 'related', score: 100, ai: false });
+    }
     const found = this.finder(clone(d), clone(candidates)) ?? [];
     for (const f of found) {
-      if (f.decision_id === d.id || !this.store.decisions.has(f.decision_id)) continue;
-      if (f.score < this.threshold) continue;
-      if (!RELATIONSHIP_TYPES.includes(f.type)) continue;
-      if (this.store.relationships.some((x) => x.decision_id === d.id && x.related_decision_id === f.decision_id)) continue;
-      this._upsertRelationship(d.id, f.decision_id, { type: f.type, score: f.score, ai: true, by: null, status: 'suggested' });
+      const target = this.store.decisions.get(f.decision_id);
+      if (!target || target.id === d.id || target.customer !== d.customer) continue;
+      if (f.score < this.threshold || !RELATIONSHIP_TYPES.includes(f.type)) continue;
+      link(target, { type: f.type, score: f.score, ai: true });
     }
   }
 
   _related(id, { includeDismissed = false } = {}) {
-    return this.store.relationships
-      .filter((r) => r.decision_id === id && (includeDismissed || r.status !== 'dismissed'))
-      .map((r) => ({ ...clone(r), related_title: this.store.decisions.get(r.related_decision_id)?.title ?? null }))
-      .sort((a, b) => b.confidence_score - a.confidence_score);
+    const keep = (r) => includeDismissed || r.status !== 'dismissed';
+    const title = (x) => this.store.decisions.get(x)?.title ?? null;
+    const outgoing = this.store.relationships.filter((r) => r.decision_id === id && keep(r))
+      .map((r) => ({ ...clone(r), direction: 'outgoing', related_title: title(r.related_decision_id) }));
+    const incoming = this.store.relationships.filter((r) => r.related_decision_id === id && keep(r))
+      .map((r) => ({ ...clone(r), decision_id: id, related_decision_id: r.decision_id, direction: 'incoming', related_title: title(r.decision_id) }));
+    return [...outgoing, ...incoming].sort((a, b) => b.confidence_score - a.confidence_score);
   }
 
   getRelated(id, actor, opts = {}) {

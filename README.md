@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 20).
 
 ```
-npm test                       # 81 tests (node:test)
+npm test                       # 84 tests (node:test)
 PORT=3000 DATA_FILE=data.json npm start
 ```
 
@@ -35,10 +35,9 @@ PORT=3000 DATA_FILE=data.json npm start
 - **Immutability**: content is hashed (SHA-256) on propose. `verifyIntegrity()` re-checks decision and all revisions.
 - **Related decisions**: default finder is bag-of-words cosine similarity (no external model). Inject an
   embedding-based `relatedFinder(decision, candidates) => [{decision_id, type, score}]` to replace it.
-  Scanning runs on create, draft save and propose. It is synchronous and only stores outgoing links.
+  Scanning runs on create, draft save and propose. Links are shown from both sides (`direction`), explicit ids like `PRJ-012` in a document are linked automatically, and the owner of the linked decision is notified. The finder is synchronous.
 
 ## Not built yet
 
 React UI, Postgres storage/migrations, browser audio recording and the speech-to-text call (the service accepts
-a finished transcript via `add_meeting`), webhooks/email, weighted votes, and the "scan when a referenced decision
-is created" trigger.
+a finished transcript via `add_meeting`), webhooks/email, weighted votes.

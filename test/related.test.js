@@ -82,3 +82,42 @@ test('rendered document lists related decisions with type and match percent', ()
   assert.match(md, /\*\*PRJ-001: Database platform selection\*\* - \*Conflicts\* \(92% match\)/);
   assert.ok(proposed);
 });
+
+test('links are visible from both sides, with direction', () => {
+  const finder = (d) => (d.id === 'PRJ-002' ? [{ decision_id: 'PRJ-001', type: 'conflicts', score: 90 }] : []);
+  const { log } = setup({ finder });
+  draft(log, { title: 'Older' });
+  const b = draft(log, { title: 'Newer' });
+  const outgoing = log.getRelated(b.id, U.alice)[0];
+  assert.equal(outgoing.direction, 'outgoing');
+  const incoming = log.getRelated('PRJ-001', U.alice);
+  assert.equal(incoming.length, 1);
+  assert.equal(incoming[0].related_decision_id, 'PRJ-002');
+  assert.equal(incoming[0].direction, 'incoming');
+  assert.equal(incoming[0].related_title, 'Newer');
+  assert.equal(incoming[0].type, 'conflicts');
+  log.reviewRelated(b.id, 'PRJ-001', U.alice, 'dismiss');
+  assert.equal(log.getRelated('PRJ-001', U.alice).length, 0, 'dismissal hides the incoming side too');
+});
+
+test('decision ids mentioned in the document are linked automatically', () => {
+  const { log } = setup({ finder: () => [] });
+  draft(log, { title: 'Database platform selection' });
+  const b = draft(log, { content: 'This builds on PRJ-001 and ignores PRJ-777 and itself (PRJ-002).' });
+  const rel = log.getRelated(b.id, U.alice);
+  assert.deepEqual(rel.map((r) => r.related_decision_id), ['PRJ-001']);
+  assert.equal(rel[0].type, 'related');
+  assert.equal(rel[0].confidence_score, 100);
+  assert.equal(rel[0].ai_identified, false);
+  log.updateDraft(b.id, U.alice, { content: 'Now also mentions PRJ-001 twice PRJ-001' });
+  assert.equal(log.getRelated(b.id, U.alice).length, 1, 'no duplicates on rescan');
+});
+
+test('incoming notification: owners are told when a new decision relates to theirs', () => {
+  const finder = (d) => (d.id === 'PRJ-002' ? [{ decision_id: 'PRJ-001', type: 'related', score: 80 }] : []);
+  const { log } = setup({ finder });
+  draft(log, { actor: U.bob });
+  draft(log, { actor: U.carol });
+  assert.ok(log.listNotifications(U.bob).some((n) => n.type === 'related_decision' && n.decision_id === 'PRJ-001'));
+  assert.equal(log.listNotifications(U.carol).some((n) => n.type === 'related_decision'), false);
+});
