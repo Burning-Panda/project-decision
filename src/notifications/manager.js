@@ -25,8 +25,8 @@ const LOW = new Set(['vote_received', 'related_decision']);
  * Other services can also push ad-hoc payloads through the same channels with deliver().
  */
 export class NotificationManager {
-  constructor(log, { channels = [], appUrl = null, batch = 100 } = {}) {
-    Object.assign(this, { log, appUrl: appUrl ? appUrl.replace(/\/+$/, '') : null, batch, running: false });
+  constructor(log, { channels = [], appUrl = null, batch = 100, maxAgeHours = 24 } = {}) {
+    Object.assign(this, { log, appUrl: appUrl ? appUrl.replace(/\/+$/, '') : null, batch, maxAgeMs: maxAgeHours * 3_600_000, running: false });
     this.registry = new Map();
     for (const c of channels) this.register(c);
   }
@@ -76,10 +76,13 @@ export class NotificationManager {
 
   plan(stats) {
     const { store } = this.log;
-    const now = this.log.clock().toISOString();
+    const nowDate = this.log.clock();
+    const now = nowDate.toISOString();
     for (const n of store.notifications.filter((x) => !x.planned).slice(0, this.batch)) {
       n.planned = true;
       stats.planned++;
+      // Retire stale notifications silently, so enabling a channel later never blasts the backlog.
+      if (nowDate.getTime() - Date.parse(n.created_at) > this.maxAgeMs) continue;
       const prefs = this.log._profileOf(n.user).preferences;
       if (prefs.muted_types.includes(n.type)) continue;
       const payload = this.buildPayload(n);

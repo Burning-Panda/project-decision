@@ -353,3 +353,31 @@ test('profiles, planning flags and channel deliveries survive a SQLite round tri
     s2.close();
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
+
+// ---------------------------------------------------------------- operational safety
+test('old notifications are never sent: enabling a channel later does not blast the backlog', async () => {
+  const mail = email();
+  const { log, clock, manager } = managed([mail]);
+  proposed(log);
+  clock.advanceHours(30); // the manager was not running (e.g. SMTP not configured yet)
+  const fresh = proposed(log, { title: 'fresh one' });
+  const stats = await manager.run();
+  assert.ok(mail.calls.length > 0);
+  assert.ok(mail.calls.every((p) => p.content.title.startsWith(`[${fresh}]`)), 'only recent notifications are delivered');
+  assert.ok(log.store.notifications.every((n) => n.planned), 'stale ones are retired, not left pending');
+  assert.equal(stats.planned, log.store.notifications.length);
+});
+
+test('pruneChannelDeliveries drops finished rows after the retention window, keeping pending ones', async () => {
+  const mail = email([failed('temporary')]);
+  const { log, clock, manager } = managed([mail]);
+  proposed(log);
+  await manager.run(); // everything fails once and stays pending
+  clock.advanceDays(40);
+  assert.deepEqual(log.pruneChannelDeliveries({ olderThanDays: 30 }), { removed: 0 }, 'pending rows are kept');
+  const total = log.store.channel_deliveries.length;
+  assert.ok(total > 0);
+  log.store.channel_deliveries.forEach((d, i) => { d.status = i % 2 ? 'sent' : 'failed'; });
+  assert.deepEqual(log.pruneChannelDeliveries({ olderThanDays: 30 }), { removed: total });
+  assert.equal(log.store.channel_deliveries.length, 0);
+});

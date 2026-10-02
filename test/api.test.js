@@ -213,3 +213,18 @@ test('webhook management endpoints', async () => {
   assert.equal((await call('DELETE', `/webhooks/${id}`, { user: U.org })).status, 200);
   assert.equal((await call('GET', '/webhooks?owner=acme', { user: U.org })).json.webhooks.length, 0);
 });
+
+test('notification profile endpoints', async () => {
+  const get = await call('GET', '/profile', { user: U.david });
+  assert.equal(get.status, 200);
+  assert.equal(get.json.profile.email, U.david);
+  assert.equal(get.json.profile.preferences.channels.email, true);
+  const put = await call('PUT', '/profile', { user: U.david, body: { phone: '+14155550123', preferences: { channels: { sms: true }, muted_types: ['mention'] } } });
+  assert.equal(put.status, 200);
+  assert.equal(put.json.profile.phone, '+14155550123');
+  assert.equal(put.json.profile.preferences.channels.sms, true);
+  assert.equal((await call('PUT', '/profile', { user: U.david, body: { phone: 'nope' } })).status, 400);
+  assert.equal((await call('GET', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.carol })).status, 403);
+  assert.equal((await call('GET', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.org })).json.profile.phone, '+14155550123');
+  assert.equal((await call('PUT', `/profile?user=${encodeURIComponent(U.david)}`, { user: U.bob, body: { phone: null } })).status, 403);
+});

@@ -5,3 +5,6 @@ export {
   createNotificationPayload, validateNotificationPayload, normalizePayload, PAYLOAD_VERSION, PRIORITIES,
   sent, failed, skipped, isDeliveryResult,
 } from './payload.js';
+export { EmailChannel, MemoryMailTransport } from './email.js';
+export { SmtpTransport, SmtpError, parseSmtpUrl } from './smtp.js';
+export { buildMimeMessage, formatAddress, parseAddress } from './mime.js';

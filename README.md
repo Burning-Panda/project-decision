@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 22.13).
 
 ```
-npm test                       # 125 tests (node:test)
+npm test                       # 170 tests (node:test)
 PORT=3000 npm start                      # in-memory
 PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite (recommended)
 PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
@@ -20,6 +20,8 @@ PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 | `src/voting.js`, `src/settings.js` | Approval-mode evaluation and project settings |
 | `src/diff.js`, `src/related.js`, `src/template.js` | Section-aware diff, pluggable related-decision finder, default template |
 | `src/store.js`, `src/sqlite-store.js` | In-memory store with JSON snapshots; SQLite store that commits changed rows transactionally |
+| `src/notifications/` | Standard `NotificationPayload`, `NotificationChannel` interface + conformance kit, `NotificationManager`, `EmailChannel`, MIME and SMTP client (see `docs/NOTIFICATIONS.md`) |
+| `src/secrets.js` | AES-256-GCM `SecretBox` for secrets at rest |
 | `src/webhooks.js`, `src/net.js` | Webhook dispatcher (signing, retries, SSRF guard), `verifySignature` for receivers |
 | `public/` | Dependency-free web UI (list, detail, actions, comments, todos, dashboard) served at `/` |
 | `src/api.js`, `src/server.js` | HTTP API (`POST /decisions/:id/actions` etc.) and entrypoint |
@@ -74,7 +76,13 @@ startup everything is re-encrypted under the new key and the old one can then be
 by earlier versions are encrypted automatically on first start. Losing the key makes stored secrets unrecoverable
 (re-create the webhooks). The key itself must live in your secret manager, not in the database.
 
+## Notifications
+
+In-app notifications (mentions, proposals, votes, follow-ups...) are also delivered through pluggable channels according to each
+user's preferences. **Email is built** (set `SMTP_URL` and `EMAIL_FROM`); SMS and push are defined by the same interface but not
+implemented. How to add one, the payload structure and the email configuration: [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md).
+
 ## Not built yet
 
 Postgres storage/migrations (SQLite is the durable option for now), browser audio recording and the speech-to-text call (the service accepts
-a finished transcript via `add_meeting`), email notifications.
+a finished transcript via `add_meeting`), SMS and push channels (interface and docs are in place), a UI for notification settings.

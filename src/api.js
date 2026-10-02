@@ -85,6 +85,9 @@ export function createApp(log, { onMutation } = {}) {
   route('GET', '/webhooks/:id/deliveries', (c) => ok(200, log.listDeliveries(c.params.id, c.actor, c.query)));
   route('POST', '/deliveries/:id/redeliver', (c) => ok(200, { delivery: log.redeliver(c.params.id, c.actor) }));
 
+  route('GET', '/profile', (c) => ok(200, { profile: log.getProfile(me(c, c.query.user), c.actor) }));
+  route('PUT', '/profile', (c) => ok(200, { profile: log.setProfile(me(c, c.query.user), c.actor, c.body) }));
+
   route('GET', '/search', (c) => ok(200, log.search({ ...c.query, actor: c.actor })));
   route('GET', '/dashboard', (c) => ok(200, { dashboard: log.dashboard(c.actor) }));
   route('GET', '/notifications', (c) => ok(200, { notifications: log.listNotifications(c.actor) }));

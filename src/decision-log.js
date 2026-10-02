@@ -148,6 +148,14 @@ export class DecisionLog {
     return { deliveries: before.deliveries - this.store.deliveries.length, events: before.events - this.store.events.length };
   }
 
+  /** Drops finished (sent/failed/skipped) channel deliveries older than the cutoff; pending ones are kept. */
+  pruneChannelDeliveries({ olderThanDays = 30 } = {}) {
+    const cutoff = new Date(this.clock().getTime() - olderThanDays * 86_400_000).toISOString();
+    const before = this.store.channel_deliveries.length;
+    this.store.channel_deliveries = this.store.channel_deliveries.filter((d) => d.status === 'pending' || d.created_at >= cutoff);
+    return { removed: before - this.store.channel_deliveries.length };
+  }
+
   _webhookView(h) {
     const { secret, secret_enc, ...rest } = clone(h);
     return rest;
