@@ -190,3 +190,26 @@ test('onMutation fires after successful writes only', async () => {
   assert.equal(calls, 1);
   await new Promise((r) => s2.close(r));
 });
+
+test('webhook management endpoints', async () => {
+  const body = { owner: 'acme', url: 'https://hooks.example.com/x', events: ['decision.*'] };
+  assert.equal((await call('POST', '/webhooks', { user: U.bob, body })).status, 403);
+  assert.equal((await call('POST', '/webhooks', { user: U.org, body: { ...body, url: 'http://127.0.0.1/x' } })).status, 400);
+  const created = await call('POST', '/webhooks', { user: U.org, body });
+  assert.equal(created.status, 201);
+  assert.match(created.json.webhook.secret, /^whsec_/);
+  const id = created.json.webhook.id;
+
+  const list = await call('GET', '/webhooks?owner=acme', { user: U.org });
+  assert.equal(list.json.webhooks.length, 1);
+  assert.equal('secret' in list.json.webhooks[0], false);
+  assert.equal((await call('GET', '/webhooks?owner=acme', { user: U.bob })).status, 403);
+
+  await call('POST', '/decisions', { user: U.alice, body: { project: 'PRJ', title: 'fires a webhook' } });
+  const deliveries = await call('GET', `/webhooks/${id}/deliveries`, { user: U.org });
+  assert.equal(deliveries.json.items[0].event_type, 'decision.created');
+  assert.equal((await call('POST', `/deliveries/${deliveries.json.items[0].id}/redeliver`, { user: U.org })).status, 200);
+
+  assert.equal((await call('DELETE', `/webhooks/${id}`, { user: U.org })).status, 200);
+  assert.equal((await call('GET', '/webhooks?owner=acme', { user: U.org })).json.webhooks.length, 0);
+});
