@@ -5,16 +5,22 @@ import { createApp } from './api.js';
 const port = Number(process.env.PORT ?? 3000);
 const dataFile = process.env.DATA_FILE;
 
-let store = new MemoryStore();
-if (dataFile && fs.existsSync(dataFile)) store = MemoryStore.fromJSON(JSON.parse(fs.readFileSync(dataFile, 'utf8')));
-const log = new DecisionLog({ store });
+const dbFile = process.env.DATABASE_FILE;
 
-const save = dataFile
-  ? () => {
-      fs.writeFileSync(`${dataFile}.tmp`, JSON.stringify(store.toJSON()));
-      fs.renameSync(`${dataFile}.tmp`, dataFile);
-    }
-  : undefined;
+let store = new MemoryStore();
+let save;
+if (dbFile) {
+  const { SqliteStore } = await import('./sqlite-store.js');
+  store = SqliteStore.open(dbFile);
+  save = () => store.commit();
+} else if (dataFile) {
+  if (fs.existsSync(dataFile)) store = MemoryStore.fromJSON(JSON.parse(fs.readFileSync(dataFile, 'utf8')));
+  save = () => {
+    fs.writeFileSync(`${dataFile}.tmp`, JSON.stringify(store.toJSON()));
+    fs.renameSync(`${dataFile}.tmp`, dataFile);
+  };
+}
+const log = new DecisionLog({ store });
 
 createApp(log, { onMutation: save }).listen(port, () => console.log(`decision-log listening on :${port}`));
 

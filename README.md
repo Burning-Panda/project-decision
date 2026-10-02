@@ -2,11 +2,13 @@
 
 Immutable decision tracking with an approval workflow, voting modes, revisions/diffs, comments,
 meeting transcripts, follow-up todos, related-decision discovery and a hash-chained audit trail.
-Zero runtime dependencies (Node >= 20).
+Zero runtime dependencies (Node >= 22.13).
 
 ```
-npm test                       # 90 tests (node:test)
-PORT=3000 DATA_FILE=data.json npm start
+npm test                       # 95 tests (node:test)
+PORT=3000 npm start                      # in-memory
+PORT=3000 DATABASE_FILE=log.db npm start  # durable SQLite (recommended)
+PORT=3000 DATA_FILE=data.json npm start   # JSON snapshot, rewritten per write
 ```
 
 ## Layout
@@ -17,7 +19,7 @@ PORT=3000 DATA_FILE=data.json npm start
 | `src/queries.js` | List, search, dashboard, reports, export |
 | `src/voting.js`, `src/settings.js` | Approval-mode evaluation and project settings |
 | `src/diff.js`, `src/related.js`, `src/template.js` | Section-aware diff, pluggable related-decision finder, default template |
-| `src/store.js` | In-memory store with JSON snapshots (plain data, swappable for a DB) |
+| `src/store.js`, `src/sqlite-store.js` | In-memory store with JSON snapshots; SQLite store that commits changed rows transactionally |
 | `public/` | Dependency-free web UI (list, detail, actions, comments, todos, dashboard) served at `/` |
 | `src/api.js`, `src/server.js` | HTTP API (`POST /decisions/:id/actions` etc.) and entrypoint |
 
@@ -41,5 +43,5 @@ PORT=3000 DATA_FILE=data.json npm start
 
 ## Not built yet
 
-Postgres storage/migrations, browser audio recording and the speech-to-text call (the service accepts
+Postgres storage/migrations (SQLite is the durable option for now), browser audio recording and the speech-to-text call (the service accepts
 a finished transcript via `add_meeting`), webhooks/email.

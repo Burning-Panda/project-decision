@@ -175,3 +175,18 @@ test('UI script only uses endpoints the API actually serves', async () => {
     assert.notEqual(r.json?.error?.code, 'NOT_FOUND', `${path} is not routed`);
   }
 });
+
+test('onMutation fires after successful writes only', async () => {
+  const { log: l2 } = setup();
+  let calls = 0;
+  const s2 = createApp(l2, { onMutation: () => { calls++; } });
+  await new Promise((r) => s2.listen(0, '127.0.0.1', r));
+  const b2 = `http://127.0.0.1:${s2.address().port}`;
+  const post = (body, user = U.alice) => fetch(`${b2}/decisions`, { method: 'POST', headers: { 'x-user': user, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await fetch(`${b2}/decisions`, { headers: { 'x-user': U.alice } })).status, 200);
+  assert.equal((await post({ project: 'PRJ' })).status, 400);
+  assert.equal(calls, 0);
+  assert.equal((await post({ project: 'PRJ', title: 'x' })).status, 201);
+  assert.equal(calls, 1);
+  await new Promise((r) => s2.close(r));
+});
