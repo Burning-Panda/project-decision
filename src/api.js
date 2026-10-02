@@ -1,7 +1,15 @@
 import http from 'node:http';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { DecisionLogError, invalid, forbidden } from './errors.js';
 
 const MAX_BODY = 1_000_000;
+const PUBLIC_DIR = fileURLToPath(new URL('../public/', import.meta.url));
+const STATIC = {
+  '/': ['index.html', 'text/html'],
+  '/app.js': ['app.js', 'text/javascript'],
+  '/style.css': ['style.css', 'text/css'],
+};
 
 async function readJson(req) {
   const chunks = [];
@@ -110,6 +118,13 @@ export function createApp(log, { onMutation } = {}) {
     };
     try {
       const url = new URL(req.url, 'http://localhost');
+      if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
+      const asset = req.method === 'GET' ? STATIC[url.pathname] : undefined;
+      if (asset) {
+        res.writeHead(200, { 'content-type': `${asset[1]}; charset=utf-8`, 'x-content-type-options': 'nosniff' });
+        res.end(fs.readFileSync(PUBLIC_DIR + asset[0]));
+        return;
+      }
       const match = routes
         .filter((r) => r.re.test(url.pathname))
         .find((r) => r.method === req.method);

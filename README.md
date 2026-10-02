@@ -5,7 +5,7 @@ meeting transcripts, follow-up todos, related-decision discovery and a hash-chai
 Zero runtime dependencies (Node >= 20).
 
 ```
-npm test                       # 88 tests (node:test)
+npm test                       # 90 tests (node:test)
 PORT=3000 DATA_FILE=data.json npm start
 ```
 
@@ -18,6 +18,7 @@ PORT=3000 DATA_FILE=data.json npm start
 | `src/voting.js`, `src/settings.js` | Approval-mode evaluation and project settings |
 | `src/diff.js`, `src/related.js`, `src/template.js` | Section-aware diff, pluggable related-decision finder, default template |
 | `src/store.js` | In-memory store with JSON snapshots (plain data, swappable for a DB) |
+| `public/` | Dependency-free web UI (list, detail, actions, comments, todos, dashboard) served at `/` |
 | `src/api.js`, `src/server.js` | HTTP API (`POST /decisions/:id/actions` etc.) and entrypoint |
 
 ## Behaviour notes / decisions where the plan was ambiguous
@@ -40,5 +41,5 @@ PORT=3000 DATA_FILE=data.json npm start
 
 ## Not built yet
 
-React UI, Postgres storage/migrations, browser audio recording and the speech-to-text call (the service accepts
+Postgres storage/migrations, browser audio recording and the speech-to-text call (the service accepts
 a finished transcript via `add_meeting`), webhooks/email.

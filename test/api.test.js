@@ -149,3 +149,29 @@ test('admin endpoints create projects and members', async () => {
   assert.equal(p.json.project.approval_settings.mode, 'veto');
   assert.equal((await call('POST', '/projects', { user: U.bob, body: { owner: 'acme', identifier: 'X', title: 'x' } })).status, 403);
 });
+
+test('serves the web UI without authentication, whitelisted files only', async () => {
+  const html = await fetch(`${base}/`);
+  assert.equal(html.status, 200);
+  assert.match(html.headers.get('content-type'), /text\/html/);
+  assert.match(await html.text(), /Decision Log/);
+  const js = await fetch(`${base}/app.js`);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('content-type'), /javascript/);
+  const css = await fetch(`${base}/style.css`);
+  assert.match(css.headers.get('content-type'), /text\/css/);
+  assert.equal((await fetch(`${base}/favicon.ico`)).status, 204);
+  const sneaky = await fetch(`${base}/..%2Fpackage.json`);
+  assert.equal(sneaky.status, 404, 'not whitelisted, so it is an unknown route');
+  assert.equal((await fetch(`${base}/index.html`)).status, 404);
+});
+
+test('UI script only uses endpoints the API actually serves', async () => {
+  const js = await (await fetch(`${base}/app.js`)).text();
+  const used = [...js.matchAll(/api\(['"`](?:GET|POST|PATCH)?['"`]?,?\s*['"`](\/[a-z]+)/g)].map((m) => m[1]);
+  assert.ok(used.length > 0);
+  for (const path of new Set(used)) {
+    const r = await call('GET', path, { user: U.alice });
+    assert.notEqual(r.json?.error?.code, 'NOT_FOUND', `${path} is not routed`);
+  }
+});
