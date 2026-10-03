@@ -18,7 +18,8 @@
     "test": "bun test",
     "test:watch": "bun test --watch",
     "test:cov": "bun test --coverage",
-    "test:parity": "bun run scripts/check-parity.ts"
+    "test:parity": "bun run scripts/check-parity.ts",
+    "test:focus": "bun test --watch --bail test/"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
