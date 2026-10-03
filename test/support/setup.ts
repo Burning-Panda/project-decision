@@ -1,4 +1,4 @@
-import { expect } from 'bun:test';
+import { beforeEach, expect } from 'bun:test';
 import { makeClock } from './clock';
 import { randomBytes } from './crypto';
 import { U, CONTENT_V1 } from './fixtures';
@@ -26,6 +26,18 @@ export async function setup({ startAt, finder, threshold, ...settings }: Record<
     actor: U.org,
   });
   return { log, clock };
+}
+
+export type LogHandle = Awaited<ReturnType<typeof setup>>;
+
+/**
+ * Call inside a describe(): registers a beforeEach that builds a fresh `setup(settings)` log
+ * and exposes { log, clock } on the returned handle, so every test starts from new state.
+ */
+export function freshLog(settings?: Record<string, any>): LogHandle {
+  const h = {} as LogHandle;
+  beforeEach(async () => { Object.assign(h, await setup(settings)); });
+  return h;
 }
 
 export const draft = (log: any, over: Record<string, any> = {}) =>
