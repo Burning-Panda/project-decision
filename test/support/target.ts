@@ -12,6 +12,7 @@
  *   src/storage/migrations/postgres.ts        MIGRATIONS
  *   src/storage/secrets.ts                    SecretBox
  *   src/webhooks/dispatcher.ts                WebhookDispatcher, verifySignature
+ *   src/decision-log/notifications/notification-dispatcher.ts   NotificationDispatcher (in-app notifications -> Notifier)
  *   src/notifications/*                       index (Notifier, channel contract), email (EmailChannel, smtpTransport), push (PushChannel)
  */
 import { Test } from '@nestjs/testing';
@@ -32,6 +33,7 @@ export { RelatedService } from '../../src/decision-log/related/related.service';
 export { ProfilesService } from '../../src/decision-log/profiles/profiles.service';
 export { WebhooksService } from '../../src/decision-log/webhooks/webhooks.service';
 export { InsightsService } from '../../src/decision-log/insights/insights.service';
+export { NotificationDispatcher } from '../../src/decision-log/notifications/notification-dispatcher';
 export { MemoryStore, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS } from '../../src/storage/store';
 export { SqliteStore } from '../../src/storage/sqlite-store';
 export { PostgresStore } from '../../src/storage/postgres-store';
