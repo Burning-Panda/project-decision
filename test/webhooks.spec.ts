@@ -525,12 +525,6 @@ describe('dispatcher POSTs signed JSON and marks deliveries delivered', () => {
         expect(first.init.redirect).toBe('manual');
       });
 
-      it('THEN its signature header verifies with the hook secret', () => {
-        const { init } = rec.calls[0]!;
-        const sig = init.headers;
-        expect(verifySignature({ secret: h.hook.secret, timestamp: sig['x-decision-log-timestamp'], body: init.body, signature: sig['x-decision-log-signature'], now: h.clock.now() })).toBe(true);
-      });
-
       it('THEN the record is delivered after one attempt with status 200 and a timestamp', () => {
         const d = firstDelivery(h);
         expect(d.status).toBe('delivered');

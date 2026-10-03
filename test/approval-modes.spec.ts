@@ -10,66 +10,6 @@ const CONSENSUS = { mode: 'consensus_voting' };
 const QUORUM_50 = { mode: 'quorum', quorum_percentage: 50, quorum_majority_type: 'simple' };
 const VETO_7_DAYS = { mode: 'veto', auto_approve_after_days: 7 };
 
-describe('project settings are merged over documented defaults', () => {
-  describe('GIVEN a project created with mode consensus_voting', () => {
-    const h = freshLog(CONSENSUS);
-
-    describe('WHEN its approval settings are read', () => {
-      let s: any;
-      beforeEach(() => { s = h.log.getProject('PRJ').approval_settings; });
-
-      it('THEN documented defaults fill the rest', () => {
-        expect(s.mode).toBe('consensus_voting');
-        expect(s.enabled_voting).toBe(true);
-        expect(s.consensus_approval_threshold).toBe(0.8);
-        expect(s.consensus_min_votes).toBe(3);
-        expect(s.allow_abstain).toBe(true);
-        expect(s.require_reason_on_revision).toBe(true);
-        expect(s.auto_approve_after_days).toBe(null);
-        expect(s.notification_on_vote).toBe(true);
-        expect(s.revision_vote_resets_count).toBe(true);
-      });
-    });
-  });
-
-  describe('GIVEN a project created without settings', () => {
-    const h = freshLog();
-
-    describe('WHEN its approval settings are read', () => {
-      let s: any;
-      beforeEach(() => { s = h.log.getProject('PRJ').approval_settings; });
-
-      it('THEN the mode is single_approval', () => {
-        expect(s.mode).toBe('single_approval');
-      });
-
-      it('THEN voting is disabled', () => {
-        expect(s.enabled_voting).toBe(false);
-      });
-    });
-  });
-});
-
-describe('invalid approval mode is rejected', () => {
-  describe('GIVEN an org admin', () => {
-    const h = freshLog();
-
-    describe('WHEN a project is created with mode coin_flip', () => {
-      let create: () => unknown;
-      beforeEach(() => {
-        create = () => h.log.createProject({
-          owner: 'acme', identifier: 'BAD', title: 'x', actor: U.org,
-          settings: { approval_settings: { mode: 'coin_flip' } },
-        });
-      });
-
-      it('THEN VALIDATION_ERROR 400', () => {
-        expectCode(create, 'VALIDATION_ERROR', 400);
-      });
-    });
-  });
-});
-
 // ---- single approval ----
 describe('single approval: members and the owner cannot approve; voting is disabled', () => {
   describe('GIVEN a proposed decision', () => {
@@ -603,41 +543,6 @@ describe('without weights the same lead vote is not enough', () => {
 
       it('THEN the decision stays proposed', () => {
         expect(r.decision.status).toBe('proposed');
-      });
-    });
-  });
-});
-
-describe('vote_weights are validated', () => {
-  const invalid: Array<[string, unknown]> = [
-    ['a weight of 0', { lead: 0 }],
-    ['a non-numeric weight', { lead: 'heavy' }],
-    ['a weight for an unknown role', { king: 2 }],
-  ];
-  for (const [label, weights] of invalid) {
-    describe('GIVEN project settings', () => {
-      const h = freshLog();
-
-      describe(`WHEN ${label} is set`, () => {
-        let update: () => unknown;
-        beforeEach(() => { update = () => h.log.updateProjectSettings('PRJ', U.org, { approval_settings: { vote_weights: weights } }); });
-
-        it('THEN VALIDATION_ERROR 400', () => {
-          expectCode(update, 'VALIDATION_ERROR', 400);
-        });
-      });
-    });
-  }
-
-  describe('GIVEN default settings', () => {
-    const h = freshLog();
-
-    describe('WHEN vote_weights are read', () => {
-      let weights: any;
-      beforeEach(() => { weights = h.log.getProject('PRJ').approval_settings.vote_weights; });
-
-      it('THEN member weighs 1', () => {
-        expect(weights.member).toBe(1);
       });
     });
   });

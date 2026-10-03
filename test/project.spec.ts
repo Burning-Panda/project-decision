@@ -21,6 +21,9 @@ describe('Project.create builds a valid record', () => {
         expect(project.approval_settings.mode).toBe('single_approval');
         expect(project.approval_settings.enabled_voting).toBe(false);
       });
+      it('THEN every role weighs 1 by default (member shown)', () => {
+        expect(project.approval_settings.vote_weights.member).toBe(1);
+      });
     });
   });
 
@@ -29,9 +32,17 @@ describe('Project.create builds a valid record', () => {
       let project: any;
       beforeEach(() => { project = Project.create(input({ settings: { approval_settings: { mode: 'consensus_voting' } } }), NOW); });
 
-      it('THEN voting is enabled and unspecified settings keep their defaults', () => {
-        expect(project.approval_settings.enabled_voting).toBe(true);
-        expect(project.approval_settings.consensus_min_votes).toBe(3);
+      it('THEN voting is enabled and unspecified settings keep their documented defaults', () => {
+        const s = project.approval_settings;
+        expect(s.mode).toBe('consensus_voting');
+        expect(s.enabled_voting).toBe(true);
+        expect(s.consensus_approval_threshold).toBe(0.8);
+        expect(s.consensus_min_votes).toBe(3);
+        expect(s.allow_abstain).toBe(true);
+        expect(s.require_reason_on_revision).toBe(true);
+        expect(s.auto_approve_after_days).toBe(null);
+        expect(s.notification_on_vote).toBe(true);
+        expect(s.revision_vote_resets_count).toBe(true);
       });
     });
   });
@@ -81,10 +92,17 @@ describe('Project.resolveSettings merges a patch over current settings', () => {
       });
     });
 
-    describe('WHEN vote_weights names an unknown role', () => {
-      it('THEN VALIDATION_ERROR', () => {
-        expectCode(() => Project.resolveSettings({ vote_weights: { wizard: 2 } }, current), 'VALIDATION_ERROR', 400);
+    const badWeights: Array<[string, Record<string, unknown>]> = [
+      ['an unknown role', { wizard: 2 }],
+      ['a weight of 0', { lead: 0 }],
+      ['a non-numeric weight', { lead: 'heavy' }],
+    ];
+    for (const [label, weights] of badWeights) {
+      describe(`WHEN vote_weights has ${label}`, () => {
+        it('THEN VALIDATION_ERROR 400', () => {
+          expectCode(() => Project.resolveSettings({ vote_weights: weights as Record<string, number> }, current), 'VALIDATION_ERROR', 400);
+        });
       });
-    });
+    }
   });
 });

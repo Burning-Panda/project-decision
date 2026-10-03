@@ -3,6 +3,7 @@ import { setup, proposed, act, draft, startApi, makeCaller, U, CONTENT_V1, CONTE
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one request (beforeEach), THEN only asserts.
 // Every THEN runs against a freshly built log and API.
+// Routing, authentication and public assets are covered by routes.spec.ts; this spec covers behaviour over HTTP.
 
 type Caller = ReturnType<typeof makeCaller>;
 type Reply = Awaited<ReturnType<Caller>>;
@@ -31,23 +32,6 @@ async function postDecision(base: string, body: unknown, { user = U.alice, raw =
 
 const actions = (call: Caller, user: string, body: unknown, headers: Record<string, string> = {}) =>
   call('POST', '/decisions/PRJ-001/actions', { user, body, headers });
-
-describe('requests without X-User are rejected', () => {
-  describe('GIVEN a running API', () => {
-    const api = runningApi();
-
-    describe('WHEN GET /decisions has no X-User', () => {
-      let r: Reply;
-      beforeEach(async () => { r = await api.call('GET', '/decisions'); });
-
-      it('THEN 401 UNAUTHENTICATED in the failure envelope', () => {
-        expect(r.status).toBe(401);
-        expect(r.json.success).toBe(false);
-        expect(r.json.error.code).toBe('UNAUTHENTICATED');
-      });
-    });
-  });
-});
 
 describe('create and fetch a decision', () => {
   describe('GIVEN a project', () => {
@@ -122,15 +106,6 @@ describe('validation and malformed bodies produce 400s in the standard envelope'
       it('THEN 400 VALIDATION_ERROR', () => {
         expect(r.status).toBe(400);
         expect(r.json.error.code).toBe('VALIDATION_ERROR');
-      });
-    });
-
-    describe('WHEN an unknown route is requested', () => {
-      let r: Reply;
-      beforeEach(async () => { r = await api.call('GET', '/nope', { user: U.alice }); });
-
-      it('THEN 404', () => {
-        expect(r.status).toBe(404);
       });
     });
   });
@@ -470,73 +445,6 @@ describe('admin endpoints create projects and members', () => {
 
       it('THEN 403', () => {
         expect(r.status).toBe(403);
-      });
-    });
-  });
-});
-
-describe('serves the web UI without authentication, whitelisted files only', () => {
-  describe('GIVEN no credentials', () => {
-    const api = runningApi();
-
-    describe('WHEN GET /', () => {
-      let res: Response;
-      let body: string;
-      beforeEach(async () => {
-        res = await fetch(`${api.base}/`);
-        body = await res.text();
-      });
-
-      it('THEN 200 text/html titled Decision Log', () => {
-        expect(res.status).toBe(200);
-        expect(res.headers.get('content-type')).toMatch(/text\/html/);
-        expect(body).toMatch(/Decision Log/);
-      });
-    });
-
-    describe('WHEN GET /app.js', () => {
-      let res: Response;
-      beforeEach(async () => { res = await fetch(`${api.base}/app.js`); });
-
-      it('THEN 200 JavaScript', () => {
-        expect(res.status).toBe(200);
-        expect(res.headers.get('content-type')).toMatch(/javascript/);
-      });
-    });
-
-    describe('WHEN GET /style.css', () => {
-      let res: Response;
-      beforeEach(async () => { res = await fetch(`${api.base}/style.css`); });
-
-      it('THEN text/css', () => {
-        expect(res.headers.get('content-type')).toMatch(/text\/css/);
-      });
-    });
-
-    describe('WHEN GET /favicon.ico', () => {
-      let res: Response;
-      beforeEach(async () => { res = await fetch(`${api.base}/favicon.ico`); });
-
-      it('THEN 204', () => {
-        expect(res.status).toBe(204);
-      });
-    });
-
-    describe('WHEN a path traversal GET /..%2Fpackage.json is attempted', () => {
-      let res: Response;
-      beforeEach(async () => { res = await fetch(`${api.base}/..%2Fpackage.json`); });
-
-      it('THEN 404 because it is not whitelisted', () => {
-        expect(res.status).toBe(404);
-      });
-    });
-
-    describe('WHEN GET /index.html, a file that is not whitelisted', () => {
-      let res: Response;
-      beforeEach(async () => { res = await fetch(`${api.base}/index.html`); });
-
-      it('THEN 404', () => {
-        expect(res.status).toBe(404);
       });
     });
   });

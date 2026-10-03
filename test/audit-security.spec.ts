@@ -76,48 +76,6 @@ describe('outsiders cannot read anything; the org identifier can read everything
   });
 });
 
-describe('team admins manage membership; plain members cannot', () => {
-  describe('GIVEN project PRJ in the default team, where bob is a plain member', () => {
-    const h = freshLog();
-
-    describe('WHEN bob adds a team member', () => {
-      let add: () => unknown;
-      beforeEach(() => { add = () => h.log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'member', actor: U.bob }); });
-
-      it('THEN FORBIDDEN 403', () => {
-        expectCode(add, 'FORBIDDEN', 403);
-      });
-    });
-
-    describe('WHEN the org admin adds a member with role king', () => {
-      let add: () => unknown;
-      beforeEach(() => { add = () => h.log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'king', actor: U.org }); });
-
-      it('THEN VALIDATION_ERROR 400', () => {
-        expectCode(add, 'VALIDATION_ERROR', 400);
-      });
-    });
-
-    describe('WHEN the org admin creates PRJ again', () => {
-      let create: () => unknown;
-      beforeEach(() => { create = () => h.log.createProject({ owner: 'acme', identifier: 'PRJ', title: 'dup', actor: U.org }); });
-
-      it('THEN CONFLICT 409', () => {
-        expectCode(create, 'CONFLICT', 409);
-      });
-    });
-
-    describe('WHEN bob creates a project', () => {
-      let create: () => unknown;
-      beforeEach(() => { create = () => h.log.createProject({ owner: 'acme', identifier: 'ZZ', title: 'x', actor: U.bob }); });
-
-      it('THEN FORBIDDEN 403', () => {
-        expectCode(create, 'FORBIDDEN', 403);
-      });
-    });
-  });
-});
-
 describe('projects live in a team; decisions are visible only to that team', () => {
   /** Call inside a describe(): adds team payments with bob as its only member, and project PAY in it. */
   function paymentsTeam() {

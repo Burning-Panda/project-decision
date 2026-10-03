@@ -117,6 +117,38 @@ describe('the web UI assets are public and whitelisted', () => {
       });
     });
   });
+
+  describe('GIVEN no credentials', () => {
+    const api = runningApi();
+
+    describe('WHEN GET / is read', () => {
+      let body: string;
+      beforeEach(async () => { body = await (await fetch(`${api.base}/`)).text(); });
+
+      it('THEN the page is titled Decision Log', () => {
+        expect(body).toMatch(/Decision Log/);
+      });
+    });
+  });
+
+  const notWhitelisted: Array<[string, string]> = [
+    ['a path traversal', '/..%2Fpackage.json'],
+    ['a file that exists but is not whitelisted', '/index.html'],
+  ];
+  for (const [label, path] of notWhitelisted) {
+    describe('GIVEN no credentials', () => {
+      const api = runningApi();
+
+      describe(`WHEN ${label} (GET ${path}) is requested`, () => {
+        let res: Response;
+        beforeEach(async () => { res = await fetch(`${api.base}${path}`); });
+
+        it('THEN 404', () => {
+          expect(res.status).toBe(404);
+        });
+      });
+    });
+  }
 });
 
 describe('the route table is complete', () => {
