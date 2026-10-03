@@ -6,11 +6,11 @@
                            fallback · persistence
 ```
 
-* **`NotificationPayload`** (`src/notifications/payload.js`) is the one standard, channel-agnostic structure every
+* **`NotificationPayload`** (`src/notifications/index.ts`) is the one standard, channel-agnostic structure every
   channel receives: `{ version, id, type, priority, recipient{user,email,phone,push_tokens}, content{title,body,html,link}, context{decision_id,project,actor}, data, created_at, dedupe_key }`.
   It is validated (`validateNotificationPayload`), frozen, and header-injection safe.
-* **`NotificationChannel`** (`src/notifications/channel.js`) is the interface a delivery service implements.
-* **`NotificationManager`** (`src/notifications/manager.js`) owns everything else: turning notifications into payloads,
+* **`NotificationChannel`** (`src/notifications/index.ts`) is the interface a delivery service implements.
+* **`NotificationManager`** (`src/notifications/index.ts`) owns everything else: turning notifications into payloads,
   respecting each user's preferences, per-channel retries with backoff (1m, 5m, 30m, 2h, 5 attempts), fallback order,
   persistence of every attempt, and ignoring notifications older than `maxAgeHours` (24) so a newly enabled channel never
   blasts the backlog.
@@ -19,8 +19,8 @@
 
 Extend `NotificationChannel` and implement three members:
 
-```js
-import { NotificationChannel, sent, failed } from './src/notifications/index.js';
+```ts
+import { NotificationChannel, sent, failed } from './src/notifications/index.js'  // compiled import path; the source is index.ts;
 
 export class SmsChannel extends NotificationChannel {
   constructor({ client, from }) { super(); this.client = client; this.from = from; }
@@ -50,11 +50,11 @@ Contract details:
 
 Then:
 
-1. **Test it with the conformance kit**: `assert.deepEqual(await checkChannelConformance(channel, { payload, unaddressable }), [])`
-   (see `test/email.test.js`; `test/notifications.test.js` shows fake SMS/push channels driving the manager).
+1. **Test it with the conformance kit**: `expect(await checkChannelConformance(channel, { payload, unaddressable })).toEqual([])`
+   (see `test/email.spec.ts`; `test/notifications.spec.ts` shows fake SMS/push channels driving the manager).
 2. **Store the address**: SMS needs `phone` (E.164) and push needs `push_tokens`; both already exist on the user profile
    (`PUT /profile`). A new kind of address needs a field in `setProfile` + `normalizePayload`/`validateNotificationPayload`.
-3. **Register it** in `src/server.js`: `notifications.register(new SmsChannel({...}))`. Nothing else changes: preferences
+3. **Register it** where the app is composed (`src/main.ts` / the root module): `notifications.register(new SmsChannel({...}))`. Nothing else changes: preferences
    (`enabled`, `order`, `mode: all|fallback`, `muted_types`), retries and persistence apply automatically.
 
 Other services can reuse the channels without the queue: `await manager.deliver(payloadInput, { channels: ['sms'] })`

@@ -120,7 +120,3 @@ implemented. How to add one, the payload structure and the email configuration: 
 - Porting the remaining stubs from `backup/src/` (domain service, stores, webhook dispatcher, notification manager, profile and webhook endpoints) and wiring them into `src/main.ts`.
 - Browser audio recording and the speech-to-text call (the service accepts a finished transcript via `add_meeting`).
 - SMS and push channels (interface and docs are in place) and a UI for notification settings.
-
-## Known doc/CI drift
-
-`docs/*.md` and `.github/workflows/test.yml` still reference the old `.js` paths and `npm`/`node:test`; update them as each area is ported.

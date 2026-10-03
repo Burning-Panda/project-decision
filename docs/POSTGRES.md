@@ -4,8 +4,7 @@
 DATABASE_URL=postgres://user:pass@host:5432/dbname   # enables PostgreSQL
 DATABASE_SCHEMA=decision_log                          # optional, default "decision_log"
 SECRETS_KEY=...                                       # required (see README, "Secrets at rest")
-npm install                                           # installs the optional `pg` driver
-npm start
+bun run start
 ```
 
 Use `sslmode=require` (or stricter) in the URL for remote databases. The role needs `CREATE` on the database for the first start
@@ -13,7 +12,7 @@ Use `sslmode=require` (or stricter) in the URL for remote databases. The role ne
 
 ## How it works
 
-The service keeps its working set in memory and persists changes through a store. `PostgresStore` (`src/postgres-store.js`) writes
+The service keeps its working set in memory and persists changes through a store. `PostgresStore` (`src/storage/postgres-store.ts`) writes
 **only the rows that changed since the last commit, in one transaction**, as `jsonb` in one table per collection
 (`decisions`, `comments`, `audit`, `webhooks`, ...; each is `k text primary key, data jsonb, updated_at timestamptz`) with a few
 indexes for reporting (`decisions.status`, `followups.assigned_to`, `audit.decision_id`, ...). Everything is plain SQL-queryable:
@@ -28,7 +27,7 @@ SELECT k, data->>'title' FROM decision_log.decisions WHERE data->>'status' = 'pr
 * **Single writer.** Because the working set is in memory, two instances on one schema would overwrite each other. `open()` takes a
   session-level advisory lock and a second instance **refuses to start**. If the connection (and so the lock) is lost, the process
   exits so its supervisor can restart it; it reloads from the database on start. Run one replica, or use separate schemas per tenant.
-* **Migrations.** `src/migrations/postgres.js` is an append-only, versioned list applied on startup under the lock and recorded in
+* **Migrations.** `src/storage/migrations/postgres.ts` is an append-only, versioned list applied on startup under the lock and recorded in
   `<schema>.schema_migrations`. A database with a *newer* version than the application is refused (upgrade the application first).
   Never edit a released migration; add a new one.
 * **Graceful shutdown.** `SIGTERM`/`SIGINT` flush pending changes and release the lock.
@@ -44,9 +43,9 @@ The JSON snapshot format is the same for every store: `MemoryStore.fromJSON(json
 
 ## Running the PostgreSQL tests
 
-The Postgres tests are skipped unless a database is provided; each test uses its own throw-away schema:
+The Postgres specs (`test/postgres-store.spec.ts`) are skipped unless a database is provided; each test uses its own throw-away schema:
 
 ```
-TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres npm test
+TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres bun test test/
 # e.g. docker run --rm -p 5432:5432 -e POSTGRES_PASSWORD=postgres postgres:16
 ```
