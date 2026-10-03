@@ -1,42 +1,46 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   NotificationChannel, NotificationManager, createNotificationPayload, validateNotificationPayload,
   sent, failed, skipped, isDeliveryResult, checkChannelConformance,
+  type ChannelName, type DeliveryResult, type NotificationPayload, type NotificationPayloadInput, type NotificationPriority,
   SqliteStore, buildLog, setup, proposed, act, expectCode, makeClock, testBox, tmpDbFile, U,
 } from './support/index';
 
 // ---------------------------------------------------------------- test doubles
+type Script = (DeliveryResult | Error)[];
+type Address = 'email' | 'phone' | 'push_tokens';
+
 class FakeChannel extends NotificationChannel {
-  channelName: string;
-  needs: string;
-  script: any[];
-  calls: any[] = [];
-  constructor(channelName: string, { needs = 'email', script = [] as any[] } = {}) {
+  channelName: ChannelName;
+  needs: Address;
+  script: Script;
+  calls: NotificationPayload[] = [];
+  constructor(channelName: ChannelName, { needs = 'email', script = [] }: { needs?: Address; script?: Script } = {}) {
     super();
     this.channelName = channelName;
     this.needs = needs;
     this.script = script; // results (or Errors) returned by successive send() calls; last one repeats
   }
   get name() { return this.channelName; }
-  supports(payload: any) { return Boolean(this.needs === 'push_tokens' ? payload.recipient.push_tokens.length : payload.recipient[this.needs]); }
-  async send(payload: any) {
+  supports(payload: NotificationPayload) { return Boolean(this.needs === 'push_tokens' ? payload.recipient.push_tokens.length : payload.recipient[this.needs]); }
+  async send(payload: NotificationPayload): Promise<DeliveryResult> {
     this.calls.push(payload);
     const next = this.script[Math.min(this.calls.length - 1, this.script.length - 1)] ?? sent(`${this.name}-${this.calls.length}`);
     if (next instanceof Error) throw next;
     return next;
   }
 }
-const email = (script?: any[]) => new FakeChannel('email', { needs: 'email', script });
-const sms = (script?: any[]) => new FakeChannel('sms', { needs: 'phone', script });
-const push = (script?: any[]) => new FakeChannel('push', { needs: 'push_tokens', script });
+const email = (script?: Script) => new FakeChannel('email', { needs: 'email', script });
+const sms = (script?: Script) => new FakeChannel('sms', { needs: 'phone', script });
+const push = (script?: Script) => new FakeChannel('push', { needs: 'push_tokens', script });
 
-const INPUT = {
+const INPUT: NotificationPayloadInput = {
   id: 'notif-001', type: 'decision_proposed',
   recipient: { user: U.bob, email: U.bob },
   content: { title: 'Decision proposed', body: 'PRJ-001 needs your review' },
 };
 
-async function managed(channels: any[], { settings, appUrl = 'https://dl.example.com' }: { settings?: Record<string, any>; appUrl?: string } = {}) {
+async function managed(channels: NotificationChannel[], { settings, appUrl = 'https://dl.example.com' }: { settings?: Record<string, any>; appUrl?: string } = {}) {
   const ctx = await setup(settings);
   const manager = new NotificationManager(ctx.log, { appUrl });
   for (const c of channels) manager.register(c);
@@ -44,7 +48,7 @@ async function managed(channels: any[], { settings, appUrl = 'https://dl.example
 }
 
 /** One proposed decision whose single notification (to bob) is kept, so delivery rows are predictable. */
-async function singleNotification(channel: any) {
+async function singleNotification(channel: NotificationChannel) {
   const ctx = await managed([channel]);
   ctx.log.createDecision({ project: 'PRJ', actor: U.alice, title: 'x' });
   act(ctx.log, 'PRJ-001', U.alice, 'propose');
@@ -90,7 +94,7 @@ describe('createNotificationPayload fills defaults and freezes the result', () =
     describe('WHEN a nested field is assigned in strict mode', () => {
       it('THEN it throws a TypeError', () => {
         const p = createNotificationPayload(INPUT);
-        expect(() => { 'use strict'; p.content.title = 'x'; }).toThrow(TypeError);
+        expect(() => { 'use strict'; (p.content as { title: string }).title = 'x'; }).toThrow(TypeError);
       });
     });
   });
@@ -116,7 +120,7 @@ describe('payload validation reports every problem', () => {
   describe('GIVEN an invalid priority', () => {
     describe('WHEN a payload is created', () => {
       it('THEN VALIDATION_ERROR 400', () => {
-        expectCode(() => createNotificationPayload({ ...INPUT, priority: 'urgent' }), 'VALIDATION_ERROR', 400);
+        expectCode(() => createNotificationPayload({ ...INPUT, priority: 'urgent' as NotificationPriority }), 'VALIDATION_ERROR', 400);
       });
     });
   });
@@ -187,12 +191,12 @@ describe('NotificationChannel is abstract', () => {
     });
     describe('WHEN supports is called', () => {
       it('THEN it demands an implementation', () => {
-        expect(() => new NotificationChannel().supports({})).toThrow(/implement/i);
+        expect(() => new NotificationChannel().supports({} as NotificationPayload)).toThrow(/implement/i);
       });
     });
     describe('WHEN send is called', () => {
       it('THEN it rejects demanding an implementation', async () => {
-        await expect(new NotificationChannel().send({})).rejects.toThrow(/implement/i);
+        await expect(new NotificationChannel().send({} as NotificationPayload)).rejects.toThrow(/implement/i);
       });
     });
   });
@@ -231,39 +235,57 @@ describe('the conformance kit accepts a well-behaved channel and flags broken on
 
 // ---------------------------------------------------------------- manager registration
 describe('the manager validates and registers channels', () => {
-  const fresh = async () => new NotificationManager((await setup()).log);
+  const capture = (fn: () => unknown): unknown => {
+    try { fn(); } catch (error) { return error; }
+    return undefined;
+  };
 
   describe('GIVEN a manager', () => {
-    describe('WHEN a channel is registered', () => {
-      it('THEN its name is listed', async () => {
-        const manager = await fresh();
-        manager.register(email());
+    let manager: NotificationManager;
+    beforeEach(async () => {
+      manager = new NotificationManager((await setup()).log);
+    });
+
+    describe('WHEN an email channel is registered', () => {
+      beforeEach(() => { manager.register(email()); });
+
+      it('THEN its name is listed', () => {
         expect(manager.channelNames).toEqual(['email']);
       });
     });
-  });
 
-  describe('GIVEN a registered email channel', () => {
-    describe('WHEN another email channel is registered', () => {
-      it('THEN it is rejected as already registered', async () => {
-        const manager = await fresh();
-        manager.register(email());
-        expect(() => manager.register(email())).toThrow(/already registered/i);
-      });
-    });
-  });
-
-  describe('GIVEN a manager', () => {
     describe('WHEN a plain object is registered', () => {
-      it('THEN it must be a NotificationChannel', async () => {
-        const manager = await fresh();
-        expect(() => manager.register({ name: 'x', send() {} } as any)).toThrow(/NotificationChannel/);
+      let error: unknown;
+      beforeEach(() => { error = capture(() => manager.register({ name: 'x', send() {} } as unknown as NotificationChannel)); });
+
+      it('THEN it must be a NotificationChannel', () => {
+        expect(String(error)).toMatch(/NotificationChannel/);
       });
     });
+
     describe('WHEN a channel with an invalid name is registered', () => {
-      it('THEN the name is rejected', async () => {
-        const manager = await fresh();
-        expect(() => manager.register(new FakeChannel('Not Valid!'))).toThrow(/name/);
+      let error: unknown;
+      beforeEach(() => { error = capture(() => manager.register(new FakeChannel('Not Valid!'))); });
+
+      it('THEN the name is rejected', () => {
+        expect(String(error)).toMatch(/name/);
+      });
+    });
+  });
+
+  describe('GIVEN a manager with an email channel registered', () => {
+    let manager: NotificationManager;
+    beforeEach(async () => {
+      manager = new NotificationManager((await setup()).log);
+      manager.register(email());
+    });
+
+    describe('WHEN another email channel is registered', () => {
+      let error: unknown;
+      beforeEach(() => { error = capture(() => manager.register(email())); });
+
+      it('THEN it is rejected as already registered', () => {
+        expect(String(error)).toMatch(/already registered/i);
       });
     });
   });
@@ -400,7 +422,7 @@ describe('in-app notifications are turned into standard payloads and sent once',
     describe('WHEN the manager runs', () => {
       it('THEN bob\'s email payload has the standard title, body, link, recipient, context and priority', async () => {
         const { mail, id } = await ran();
-        const toBob = mail.calls.find((p: any) => p.recipient.user === U.bob);
+        const toBob = mail.calls.find((p) => p.recipient.user === U.bob)!;
         expect(toBob.type).toBe('decision_proposed');
         expect(toBob.content.title).toBe(`[${id}] Decision proposed for review`);
         expect(toBob.content.body).toMatch(/was proposed/);
@@ -416,7 +438,7 @@ describe('in-app notifications are turned into standard payloads and sent once',
     describe('WHEN it is validated', () => {
       it('THEN it is valid', async () => {
         const { mail } = await ran();
-        const toBob = mail.calls.find((p: any) => p.recipient.user === U.bob);
+        const toBob = mail.calls.find((p) => p.recipient.user === U.bob)!;
         expect(validateNotificationPayload(toBob)).toEqual([]);
       });
     });
@@ -682,7 +704,7 @@ describe('a malformed result from a channel is a failure, not a crash', () => {
   describe('GIVEN a channel returning {ok:true}', () => {
     describe('WHEN the manager runs', () => {
       it('THEN it retries and records "invalid delivery result"', async () => {
-        const { log, manager } = await managed([email([{ ok: true }])]);
+        const { log, manager } = await managed([email([{ ok: true } as unknown as DeliveryResult])]);
         proposed(log);
         expect((await manager.run()).retrying).toBeGreaterThan(0);
         expect(log.store.channel_deliveries[0].last_error).toMatch(/invalid delivery result/i);
@@ -740,7 +762,7 @@ describe('deliver() sends an ad-hoc payload through chosen channels without touc
         const { manager } = await managed([email(), sms()]);
         const results = await manager.deliver({ ...INPUT, recipient: { user: U.bob, email: U.bob } });
         expect(results.map((r: any) => [r.channel, r.result.status])).toEqual([['email', 'sent'], ['sms', 'skipped']]);
-        expect(results[1].result.reason).toBe('no_address');
+        expect(results[1].result).toEqual(skipped('no_address'));
       });
     });
   });
@@ -759,7 +781,7 @@ describe('deliver() sends an ad-hoc payload through chosen channels without touc
     describe('WHEN deliver is given an invalid priority', () => {
       it('THEN it rejects', async () => {
         const { manager } = await managed([email(), sms()]);
-        await expect(manager.deliver({ ...INPUT, priority: 'urgent' })).rejects.toThrow(/priority/);
+        await expect(manager.deliver({ ...INPUT, priority: 'urgent' as NotificationPriority })).rejects.toThrow(/priority/);
       });
     });
     describe('WHEN deliver is limited to an unregistered channel', () => {

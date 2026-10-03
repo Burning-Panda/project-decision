@@ -14,4 +14,6 @@ export class SmtpTransport {
   }
 }
 
-export const parseSmtpUrl = (_url: string): Record<string, any> => throw new NotImplementedError('parseSmtpUrl');
+export const parseSmtpUrl = (_url: string): Record<string, any> => {
+  throw new NotImplementedError('parseSmtpUrl');
+};

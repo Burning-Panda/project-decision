@@ -42,6 +42,10 @@ export {
   NotificationChannel, NotificationManager, createNotificationPayload, validateNotificationPayload,
   sent, failed, skipped, isDeliveryResult, checkChannelConformance,
 } from '../../src/notifications/index';
+export type {
+  ChannelDelivery, ChannelName, DeliveryResult, NotificationManagerOptions, NotificationPayload,
+  NotificationPayloadInput, NotificationPriority, RunStats,
+} from '../../src/notifications/index';
 export { buildMimeMessage, formatAddress, parseAddress, dotStuff, encodeWord } from '../../src/notifications/mime';
 export { SmtpTransport, SmtpError, parseSmtpUrl } from '../../src/notifications/smtp';
 export { EmailChannel, MemoryMailTransport } from '../../src/notifications/email';
