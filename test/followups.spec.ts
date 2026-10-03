@@ -257,7 +257,8 @@ describe('overdue is derived from the due date and never applies to completed it
       it('THEN the completed todo is not overdue', async () => {
         const { log, clock, ok } = await lateAndDone();
         clock.advanceDays(10);
-        expect(log.listTodos({ user: U.bob, status: 'completed' }).items[0].id).toBe(ok.id);
+        const completed = log.listTodos({ user: U.bob, status: 'completed' }).items;
+        expect(completed.map((t: any) => [t.id, t.status])).toEqual([[ok.id, 'completed']]);
       });
     });
   });

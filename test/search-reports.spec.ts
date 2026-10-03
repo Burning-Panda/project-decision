@@ -344,10 +344,10 @@ describe('reports: volume, approval metrics, revision cycles, participation, tod
 
   describe('GIVEN bob voted', () => {
     describe('WHEN participation runs', () => {
-      it('THEN bob appears among voters with a count', async () => {
+      it('THEN bob appears among voters with a count of 1', async () => {
         const { log } = await activity();
         const p = log.report('participation', { actor: U.org });
-        expect(p.voters.find((v: any) => v.user === U.bob).count).toBeGreaterThanOrEqual(1);
+        expect(p.voters.find((v: any) => v.user === U.bob).count).toBe(1);
       });
     });
   });
@@ -363,10 +363,18 @@ describe('reports: volume, approval metrics, revision cycles, participation, tod
 
   describe('GIVEN activity during March', () => {
     describe('WHEN the audit report runs for March', () => {
-      it('THEN it has more than five entries', async () => {
+      it('THEN it includes the three votes and the revision request', async () => {
         const { log } = await activity();
         const au = log.report('audit', { actor: U.org, from: '2024-03-01', to: '2024-03-31' });
-        expect(au.entries.length).toBeGreaterThan(5);
+        const actions = au.entries.map((e: any) => e.action);
+        expect(actions.filter((a: string) => a === 'vote').length).toBe(3);
+        expect(actions).toContain('request_revision');
+      });
+    });
+    describe('WHEN the audit report runs for April', () => {
+      it('THEN it is empty', async () => {
+        const { log } = await activity();
+        expect(log.report('audit', { actor: U.org, from: '2024-04-01', to: '2024-04-30' }).entries).toEqual([]);
       });
     });
   });

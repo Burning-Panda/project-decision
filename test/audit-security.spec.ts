@@ -161,7 +161,7 @@ describe('every action is audited with before/after state, ip and a verifiable h
 describe('audit trail filters by actor and detects tampering', () => {
   describe('GIVEN actions by several actors', () => {
     describe('WHEN the trail is filtered by alice', () => {
-      it('THEN only her entries return', async () => {
+      it('THEN exactly her entries return (create and propose)', async () => {
         // Given
         const { log } = await setup();
         const d = draft(log);
@@ -169,7 +169,8 @@ describe('audit trail filters by actor and detects tampering', () => {
         // When
         const mine = log.auditTrail({ actor: U.alice });
         // Then
-        expect(mine.every((e: any) => e.actor === U.alice)).toBe(true);
+        expect(mine.map((e: any) => e.action)).toEqual(['create', 'propose']);
+        expect(mine).toEqual(log.auditTrail({}).filter((e: any) => e.actor === U.alice));
       });
     });
   });

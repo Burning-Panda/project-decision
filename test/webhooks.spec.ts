@@ -282,10 +282,11 @@ describe('vote and approval events carry the documented payload', () => {
 
   describe('GIVEN votes that closed the decision', () => {
     describe('WHEN the outbox order is read', () => {
-      it('THEN vote events precede the approval', async () => {
+      it('THEN all three vote events, including the closing one, precede the approval', async () => {
         const { events } = await approvedByVotes();
-        const vote = events.find((e) => e.type === 'decision.vote_received');
-        expect(events.indexOf(vote)).toBeLessThan(events.indexOf(events.at(-1)));
+        const types = events.map((e) => e.type);
+        expect(types.filter((t) => t === 'decision.vote_received').length).toBe(3);
+        expect(types.lastIndexOf('decision.vote_received')).toBeLessThan(types.indexOf('decision.approved'));
       });
     });
   });

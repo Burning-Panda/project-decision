@@ -45,8 +45,10 @@ describe('in-app notifications are turned into standard payloads and sent once',
     describe('WHEN the manager runs', () => {
       it('THEN every one is planned and sent', async () => {
         const { log, mail, stats } = await ran();
-        expect(stats.planned).toBe(log.store.notifications.length);
-        expect(stats.sent).toBe(mail.calls.length);
+        expect(log.store.notifications.length).toBe(4);
+        expect(stats.planned).toBe(4);
+        expect(stats.sent).toBe(4);
+        expect(mail.calls.length).toBe(4);
       });
     });
   });
@@ -260,10 +262,10 @@ describe('a channel that throws is treated as a retryable failure', () => {
 
   describe('GIVEN a channel that throws', () => {
     describe('WHEN the manager runs', () => {
-      it('THEN deliveries retry and the error text is recorded', async () => {
+      it('THEN the throwing delivery retries with its error recorded; the other three are sent', async () => {
         const { log, manager } = await throwing();
         const stats = await manager.run();
-        expect(stats.retrying).toBeGreaterThan(0);
+        expect(stats).toMatchObject({ sent: 3, retrying: 1 }); // only the first send throws
         expect(log.store.channel_deliveries[0].last_error).toMatch(/socket hang up/);
       });
     });
@@ -271,11 +273,11 @@ describe('a channel that throws is treated as a retryable failure', () => {
 
   describe('GIVEN a throw on the first attempt', () => {
     describe('WHEN two minutes pass and the manager runs', () => {
-      it('THEN delivery succeeds', async () => {
+      it('THEN the retried delivery is sent', async () => {
         const { clock, manager } = await throwing();
         await manager.run();
         clock.advanceMinutes(2);
-        expect((await manager.run()).sent).toBeGreaterThan(0);
+        expect((await manager.run()).sent).toBe(1);
       });
     });
   });
@@ -316,7 +318,8 @@ describe('concurrent runs do not double-send', () => {
         // Then
         const perNotification = new Map<string, number>();
         for (const p of slow.payloads) perNotification.set(p.id, (perNotification.get(p.id) ?? 0) + 1);
-        expect([...perNotification.values()].every((n) => n === 1)).toBe(true);
+        expect(slow.calls.length).toBe(4);
+        expect([...perNotification.values()]).toEqual([1, 1, 1, 1]);
       });
     });
   });
@@ -393,7 +396,7 @@ describe('old notifications are never sent: enabling a channel later does not bl
     describe('WHEN the manager first runs', () => {
       it('THEN only the fresh one is delivered', async () => {
         const { mail, fresh } = await backlog();
-        expect(mail.calls.length).toBeGreaterThan(0);
+        expect(mail.calls.length).toBe(4);
         expect(mail.payloads.every((p: any) => p.title.startsWith(`[${fresh}]`))).toBe(true);
       });
     });
@@ -404,7 +407,8 @@ describe('old notifications are never sent: enabling a channel later does not bl
       it('THEN stale notifications are retired as planned, not left pending', async () => {
         const { log, stats } = await backlog();
         expect(log.store.notifications.every((n: any) => n.planned)).toBe(true);
-        expect(stats.planned).toBe(log.store.notifications.length);
+        expect(log.store.notifications.length).toBe(8);
+        expect(stats.planned).toBe(8);
       });
     });
   });
@@ -424,7 +428,7 @@ describe('pruneChannelDeliveries drops finished rows after the retention window,
       it('THEN none are removed', async () => {
         const { log } = await pendingRows();
         expect(log.pruneChannelDeliveries({ olderThanDays: 30 })).toEqual({ removed: 0 });
-        expect(log.store.channel_deliveries.length).toBeGreaterThan(0);
+        expect(log.store.channel_deliveries.length).toBe(4);
       });
     });
   });
