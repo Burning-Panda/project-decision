@@ -15,7 +15,7 @@ export class UiController {
 
   @Get('app')
   script(@Res() res: Response) {
-    return sendAsset(res, PUBLIC_DIR + 'app.js', 'text/javascript');
+    return sendAsset(res, PUBLIC_DIR + 'app', 'text/javascript');
   }
 
   @Get('style.css')
