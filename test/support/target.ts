@@ -15,6 +15,7 @@
  *   src/storage/secrets.ts                    SecretBox
  *   src/webhooks/dispatcher.ts                WebhookDispatcher, verifySignature
  *   src/decision-log/notifications/notification-dispatcher.ts   NotificationDispatcher (in-app notifications -> Notifier)
+ *   src/server/                               readConfig, startJobs (server composition; tested in test/server/*.test.ts)
  *   src/notifications/*                       index (Notifier, channel contract), email (EmailChannel, smtpTransport), push (PushChannel)
  */
 import { Test } from '@nestjs/testing';
@@ -42,6 +43,9 @@ export { PostgresStore } from '../../src/storage/postgres-store';
 export { MIGRATIONS } from '../../src/storage/migrations/postgres';
 export { MIGRATIONS as SQLITE_MIGRATIONS } from '../../src/storage/migrations/sqlite';
 export { DATA_MIGRATIONS, applyDataMigrations } from '../../src/storage/data-migrations';
+export { readConfig, ConfigError } from '../../src/server/config';
+export { startJobs } from '../../src/server/jobs';
+export { NotImplementedError } from '../../src/common/errors';
 export type { DataMigration } from '../../src/storage/data-migrations';
 export { SecretBox } from '../../src/storage/secrets';
 export { WebhookDispatcher, verifySignature } from '../../src/webhooks/dispatcher';

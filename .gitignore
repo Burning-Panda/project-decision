@@ -60,3 +60,6 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 # Learning path progress (bun run learn)
 /.learn
+
+# Local data (DATABASE_FILE / DATA_FILE in .env.example)
+/data
