@@ -3,28 +3,26 @@
 Immutable decision tracking with an approval workflow, voting modes, revisions/diffs, comments,
 meeting transcripts, follow-up todos, related-decision discovery and a hash-chained audit trail.
 
-Built with [NestJS](https://nestjs.com) on [Bun](https://bun.sh). The original dependency-free Node
-implementation was ported from `backup/` (kept for reference until the port is complete).
+Built with [NestJS](https://nestjs.com) on [Bun](https://bun.sh).
 
-> **Status: migration in progress.** The Nest structure, routes, DTOs and test suite are in place, but
-> the domain service, stores, webhook dispatcher and notification manager are still stubs
-> (they throw `NOT_IMPLEMENTED` via `src/helpers/errors/todo.ts`). The specs are written first and
-> fail until the matching piece is ported from `backup/src/`. `src/main.ts` is still the stock Nest
-> bootstrap; wiring `ApiModule`, the store, `SECRETS_KEY` handling and the periodic `sweep()`/webhook
-> outbox timers into it is part of the remaining work.
+> **Status: built test-first.** The server (`src/main.ts`), HTTP layer, routing, error handling, the `Notifier` and the
+> email channel are in place, and the specs describe everything else. The domain services, stores, webhook dispatcher and
+> notification dispatcher are stubs that throw `NotImplementedError` until they are implemented; `bun run learn` walks
+> through them in order. The server already runs in memory: endpoints backed by a stub answer `500`, background jobs that
+> hit a stub log it once, and persistent storage refuses to start until its store is implemented.
 
 ## Quick start
 
 ```
 bun install
 cp .env.example .env     # Bun loads .env automatically; see the file for every option
-bun run start:dev        # watch mode
+bun run start:dev        # watch mode, in memory by default; the UI is at http://localhost:3000, Swagger at /api
 ```
 
 | Script | Purpose |
 |--------|---------|
-| `bun run start` / `start:dev` / `start:debug` | Run the app (`nest start`, optionally watch/debug) |
-| `bun run build` / `start:prod` | Compile to `dist/` and run it |
+| `bun run start` / `start:dev` / `start:debug` | Run the app (`nest start --exec bun`, optionally watch/debug) |
+| `bun run build` / `start:prod` | Compile to `dist/` and run it with Bun |
 | `bun test` | Specs in `test/` (bun:test) |
 | `bun run learn` | The learning path: the next step to implement and its first failing test. See [`learn/README.md`](learn/README.md) |
 | `bun run test:foundation` | Only `test/domain` (owners, teams, projects, module wiring). Every other spec builds on these, so fix them first |
@@ -41,7 +39,7 @@ Feature folders, each with a module, a controller and a `dto/` folder of validat
 
 | Path | Purpose |
 |------|---------|
-| `src/main.ts`, `src/app.module.ts` | Bootstrap and root module |
+| `src/main.ts`, `src/server/` | Composition: configuration from the environment, storage, `DecisionLog` + `ApiModule`, background jobs (sweep, webhook and notification delivery, pruning), graceful shutdown |
 | `src/decision-log/` | `DecisionLog` domain service (lifecycle, unified `perform()` action dispatcher, voting, revisions, comments, todos, audit) and `DecisionLogModule.register(options)` |
 | `src/api/` | `ApiModule.register({ log, onMutation? })` composes the feature modules plus the cross-cutting pieces: error filter, idempotency interceptor, durable-before-ack `onMutation` interceptor, route table |
 | `src/decisions/` | `POST/GET /decisions`, `/:id`, `/:id/actions`, versions, diff, comments, participants, related, integrity |
@@ -54,12 +52,11 @@ Feature folders, each with a module, a controller and a `dto/` folder of validat
 | `src/ui/` | Serves the dependency-free web UI from `public/` at `/` |
 | `src/common/` | `DecisionLogError` and the `X-User` guard |
 | `src/helpers/` | Small single-purpose helpers grouped by action (`auth/`, `errors/`, `files/`, `http/`, `routing/`) |
-| `test/` | `*.spec.ts` (bun:test, nested GIVEN/WHEN/THEN; `test/http/routes.spec.ts` is the reference) in `domain/`, `decisions/`, `webhooks/`, `notifications/`, `storage/`, `http/`. `test/support/` holds fixtures; `test/support/target.ts` is the only place specs import from `src/` |
-| `backup/` | The original Node implementation, the porting reference |
+| `test/` | `*.spec.ts` (bun:test, nested GIVEN/WHEN/THEN; `test/http/routes.spec.ts` is the reference) in `domain/`, `decisions/`, `webhooks/`, `notifications/`, `storage/`, `http/`; `test/server/*.test.ts` covers the server composition (outside the learning path). `test/support/` holds fixtures; `test/support/target.ts` is the only place specs import from `src/` |
 
 ## Behaviour notes / decisions where the plan was ambiguous
 
-These describe the intended domain behaviour (taken from the original implementation and enforced by the specs).
+These describe the intended domain behaviour, as enforced by the specs.
 
 - **Auth**: the caller is read from the `X-User` header (`XUserGuard`). This is a placeholder; put real auth in front.
   The owner/customer identifier acts as organisation admin.
@@ -112,11 +109,11 @@ by earlier versions are encrypted automatically on first start. Losing the key m
 ## Notifications
 
 In-app notifications (mentions, proposals, votes, follow-ups...) are also delivered through pluggable channels according to each
-user's preferences. **Email is built in the original implementation** (set `SMTP_URL` and `EMAIL_FROM`); SMS and push are defined by the same interface but not
+user's preferences. **Email is built in** (set `SMTP_URL` and `EMAIL_FROM`; the server then delivers every 10s); SMS and push are defined by the same interface but not
 implemented. How to add one, the payload structure and the email configuration: [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md).
 
 ## Not built yet
 
-- Porting the remaining stubs from `backup/src/` (domain service, stores, webhook dispatcher, notification manager, profile and webhook endpoints) and wiring them into `src/main.ts`.
+- The stubbed pieces: domain services, stores, webhook and notification dispatchers, and the HTTP controllers that call them (`bun run learn` lists them in order).
 - Browser audio recording and the speech-to-text call (the service accepts a finished transcript via `add_meeting`).
 - SMS and push channels (interface and docs are in place) and a UI for notification settings.

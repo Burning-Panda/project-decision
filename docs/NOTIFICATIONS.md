@@ -66,7 +66,7 @@ as a JSON string address; `PushChannel` sends `{ id, type, title, body, link }` 
 shows it. A 404/410 from the push service means the subscription is gone (permanent failure).
 
 To finish it: `bun add web-push`, implement `webPushTransport(vapid)`, `parseSubscription` and `PushChannel.send`
-(specs in `test/push.spec.ts`), and add `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` to the environment.
+(specs in `test/notifications/push.spec.ts`), and add `VAPID_SUBJECT`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` to the environment.
 
 ## Profiles
 

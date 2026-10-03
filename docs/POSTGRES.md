@@ -43,7 +43,7 @@ The JSON snapshot format is the same for every store: `MemoryStore.fromJSON(json
 
 ## Running the PostgreSQL tests
 
-The Postgres specs (`test/postgres-store.spec.ts`) are skipped unless a database is provided; each test uses its own throw-away schema:
+The Postgres specs (`test/storage/postgres-store.spec.ts`) are skipped unless a database is provided; each test uses its own throw-away schema:
 
 ```
 TEST_DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres bun test test/
