@@ -4,6 +4,8 @@ export * from './setup';
 export * from './http';
 export * from './tmp';
 export * from './target';
+export * from './channels';
+export * from './memory-mail-transport';
 export { onCleanup } from './cleanup';
 export * from './crypto';
 export * from './pg';

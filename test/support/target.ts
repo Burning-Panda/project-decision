@@ -12,7 +12,7 @@
  *   src/storage/migrations/postgres.ts        MIGRATIONS
  *   src/storage/secrets.ts                    SecretBox
  *   src/webhooks/dispatcher.ts                WebhookDispatcher, verifySignature
- *   src/notifications/*                       index (manager, channel contract, payloads), mime, smtp, email
+ *   src/notifications/*                       index (Notifier, channel contract), email (EmailChannel, smtpTransport), push (PushChannel)
  */
 import { Test } from '@nestjs/testing';
 import { DecisionLog } from '../../src/decision-log/decision-log';
@@ -38,17 +38,14 @@ export { PostgresStore } from '../../src/storage/postgres-store';
 export { MIGRATIONS } from '../../src/storage/migrations/postgres';
 export { SecretBox } from '../../src/storage/secrets';
 export { WebhookDispatcher, verifySignature } from '../../src/webhooks/dispatcher';
-export {
-  NotificationChannel, NotificationManager, createNotificationPayload, validateNotificationPayload,
-  sent, failed, skipped, isDeliveryResult, checkChannelConformance,
-} from '../../src/notifications/index';
+export { Notifier } from '../../src/notifications/index';
 export type {
-  ChannelDelivery, ChannelName, DeliveryResult, NotificationManagerOptions, NotificationPayload,
-  NotificationPayloadInput, NotificationPriority, RunStats,
+  ChannelDelivery, ChannelName, DeliveryResult, NotificationChannel, NotificationPayload, NotificationPreferences,
 } from '../../src/notifications/index';
-export { buildMimeMessage, formatAddress, parseAddress, dotStuff, encodeWord } from '../../src/notifications/mime';
-export { SmtpTransport, SmtpError, parseSmtpUrl } from '../../src/notifications/smtp';
-export { EmailChannel, MemoryMailTransport } from '../../src/notifications/email';
+export { EmailChannel, smtpTransport } from '../../src/notifications/email';
+export type { MailMessage, MailTransport } from '../../src/notifications/email';
+export { PushChannel, parseSubscription } from '../../src/notifications/push';
+export type { PushSubscription, PushTransport } from '../../src/notifications/push';
 
 /** Boots a DecisionLog through a Nest testing module. Rejects if construction rejects (e.g. missing secret box). */
 export async function buildLog(options: Record<string, any> = {}): Promise<any> {
@@ -73,6 +70,3 @@ export async function startApi(log: any, options: Record<string, any> = {}): Pro
   const { port } = app.getHttpServer().address();
   return { base: `http://127.0.0.1:${port}` };
 }
-
-/** Opens a client socket to the loopback port (the `dial` option of SmtpTransport). */
-export const dialLocal = (port: number) => Bun.connect({ hostname: '127.0.0.1', port, socket: {} as any });

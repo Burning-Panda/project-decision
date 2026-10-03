@@ -1,60 +1,19 @@
-import { NotImplementedError } from '../common/errors';
-import type { DecisionLog } from '../decision-log/decision-log';
+/** Id of a channel; users enable and disable channels by this name. */
+export type ChannelName = 'email' | 'sms' | 'push' | (string & {});
 
-// ---------------------------------------------------------------- contracts
-
-/** Channels a user can enable in their preferences today. */
-export type KnownChannelName = 'email' | 'sms' | 'push';
-/** Unique lower_snake_case id of a channel (`/^[a-z][a-z0-9_]*$/`). */
-export type ChannelName = KnownChannelName | (string & {});
-
-export type NotificationPriority = 'low' | 'normal' | 'high';
-
-export interface NotificationRecipient {
-  user: string;
-  email: string | null;
-  phone: string | null;
-  push_tokens: string[];
-}
-
-export interface NotificationContent {
+/** The one channel-agnostic structure every channel receives. Built by the caller. */
+export interface NotificationPayload {
+  /** Unique per notification; channels use it as their idempotency key. */
+  id: string;
+  /** What happened, e.g. `decision_proposed`. Recipients can mute types. */
+  type: string;
+  /** Where to reach the user, per channel. A channel with no addresses is skipped. */
+  recipient: { user: string; addresses: Partial<Record<ChannelName, string[]>> };
   title: string;
   body: string;
-  html: string | null;
   link: string | null;
-}
-
-export interface NotificationContext {
-  decision_id: string | null;
-  project: string | null;
-  actor: string | null;
-}
-
-/** The one standard, channel-agnostic structure every channel receives. Deeply frozen. */
-export interface NotificationPayload {
-  readonly version: 1;
-  readonly id: string;
-  readonly type: string;
-  readonly priority: NotificationPriority;
-  readonly recipient: Readonly<NotificationRecipient>;
-  readonly content: Readonly<NotificationContent>;
-  readonly context: Readonly<NotificationContext>;
-  readonly data: Readonly<Record<string, unknown>>;
-  readonly created_at: string;
-  readonly dedupe_key: string;
-}
-
-/** What callers provide; everything except id, type, recipient.user and content.title/body is defaulted. */
-export interface NotificationPayloadInput {
-  id: string;
-  type: string;
-  priority?: NotificationPriority;
-  recipient: Partial<NotificationRecipient> & Pick<NotificationRecipient, 'user'>;
-  content: Partial<NotificationContent> & Pick<NotificationContent, 'title' | 'body'>;
-  context?: Partial<NotificationContext>;
-  data?: Record<string, unknown>;
-  created_at?: string;
-  dedupe_key?: string;
+  /** Domain extras (decision id, project, actor...) the notifications module never reads. */
+  data: Record<string, unknown>;
 }
 
 export type DeliveryResult =
@@ -62,55 +21,19 @@ export type DeliveryResult =
   | { status: 'failed'; error: string; retryable: boolean }
   | { status: 'skipped'; reason: string };
 
-export type DeliveryStatus = DeliveryResult['status'];
-
-// ---------------------------------------------------------------- channel (strategy)
-
-/**
- * Strategy interface for one delivery service. Subclass it, implement the three members, then
- * `manager.register(new MyChannel())`. The base class is a stub: every member throws until overridden.
- */
-export class NotificationChannel {
-  /** Unique lower_snake_case id; users enable channels by this name. */
-  get name(): ChannelName {
-    throw new NotImplementedError('NotificationChannel.name must be implemented by the channel');
-  }
-
-  /** Synchronous and pure: true only if the recipient has the address this channel needs. */
-  supports(_payload: NotificationPayload): boolean {
-    throw new NotImplementedError('NotificationChannel.supports must be implemented by the channel');
-  }
-
-  /** Delivers ONE payload without mutating it. Idempotent for a given `payload.dedupe_key`. A throw counts as a retryable failure. */
-  async send(_payload: NotificationPayload): Promise<DeliveryResult> {
-    throw new NotImplementedError('NotificationChannel.send must be implemented by the channel');
-  }
+/** One delivery service. Implement it, then `notifier.register(new MyChannel())`. */
+export interface NotificationChannel {
+  readonly name: ChannelName;
+  /** Delivers ONE payload to the recipient's addresses for this channel (never empty). A throw is reported as a retryable failure. */
+  send(payload: NotificationPayload, addresses: string[]): Promise<DeliveryResult>;
 }
 
-// ---------------------------------------------------------------- manager (registry)
-
-export interface NotificationManagerOptions {
-  /** Makes notifications link back to the decision. */
-  appUrl?: string;
-  /** Notifications older than this are never sent. Default 24. */
-  maxAgeHours?: number;
-  /** Backoff between retries, in minutes. Default [1, 5, 30, 120]. */
-  retryDelaysMinutes?: readonly number[];
-  /** Attempts before giving up. Default 5. */
-  maxAttempts?: number;
-}
-
-export interface RunStats {
-  planned: number;
-  sent: number;
-  failed: number;
-  skipped: number;
-  retrying: number;
-}
-
-export interface DeliverOptions {
-  /** Restrict to these registered channels; default is every registered channel. */
-  channels?: readonly ChannelName[];
+/** How one recipient wants to be notified. Plain data supplied by the caller. */
+export interface NotificationPreferences {
+  /** Per-channel switch; channels not listed are on. */
+  channels?: Partial<Record<ChannelName, boolean>>;
+  /** Notification types the recipient does not want. */
+  muted_types?: readonly string[];
 }
 
 export interface ChannelDelivery {
@@ -118,75 +41,46 @@ export interface ChannelDelivery {
   result: DeliveryResult;
 }
 
-export class NotificationManager {
-  constructor(
-    readonly log: DecisionLog,
-    readonly options: NotificationManagerOptions = {},
-  ) {}
+const REQUIRED = ['id', 'type', 'title', 'body'] as const;
+
+/** Sends a notification through every registered, enabled channel. Keeps no queue, retries or history. */
+export class Notifier {
+  readonly #channels = new Map<ChannelName, NotificationChannel>();
 
   /** Names of the registered channels, in registration order. */
   get channelNames(): ChannelName[] {
-    throw new NotImplementedError('NotificationManager.channelNames');
+    return [...this.#channels.keys()];
   }
 
-  /** Adds a channel. Throws if it is not a NotificationChannel, has an invalid name, or the name is taken. */
-  register(_channel: NotificationChannel): this {
-    throw new NotImplementedError('NotificationManager.register');
+  /** Adds a channel. Throws if the name is taken. */
+  register(channel: NotificationChannel): this {
+    if (this.#channels.has(channel.name)) throw new Error(`Channel "${channel.name}" is already registered`);
+    this.#channels.set(channel.name, channel);
+    return this;
   }
 
-  /** One queue pass: plan new notifications, respect preferences, send what is due, schedule retries. Overlapping runs never double-send. */
-  async run(): Promise<RunStats> {
-    throw new NotImplementedError('NotificationManager.run');
-  }
+  /**
+   * Resolves with one entry per enabled channel, in registration order: `skipped` (`no_address`) when the recipient has
+   * no address for it, otherwise what the channel returned. Rejects when a required field is empty; a muted type resolves with `[]`.
+   */
+  async send(payload: NotificationPayload, preferences: NotificationPreferences = {}): Promise<ChannelDelivery[]> {
+    for (const field of REQUIRED) {
+      if (!payload[field]) throw new Error(`Notification ${field} is required`);
+    }
+    if (!payload.recipient?.user) throw new Error('Notification recipient.user is required');
+    if (preferences.muted_types?.includes(payload.type)) return [];
 
-  /** One-shot delivery of an ad-hoc payload; not persisted, not retried. */
-  async deliver(_input: NotificationPayloadInput, _options: DeliverOptions = {}): Promise<ChannelDelivery[]> {
-    throw new NotImplementedError('NotificationManager.deliver');
+    const enabled = [...this.#channels.values()].filter((channel) => preferences.channels?.[channel.name] !== false);
+    return Promise.all(enabled.map(async (channel) => ({ channel: channel.name, result: await deliver(channel, payload) })));
   }
 }
 
-// ---------------------------------------------------------------- payloads
-
-export const createNotificationPayload = (_input: NotificationPayloadInput): NotificationPayload => {
-  throw new NotImplementedError('createNotificationPayload');
-};
-
-/** Every problem found, as `field: message` strings; empty when valid. */
-export const validateNotificationPayload = (_input: unknown): string[] => {
-  throw new NotImplementedError('validateNotificationPayload');
-};
-
-// ---------------------------------------------------------------- delivery results
-
-export const sent = (_providerId?: string): DeliveryResult => {
-  throw new NotImplementedError('sent');
-};
-
-export const failed = (_error: string, _options?: { retryable?: boolean }): DeliveryResult => {
-  throw new NotImplementedError('failed');
-};
-
-export const skipped = (_reason: string): DeliveryResult => {
-  throw new NotImplementedError('skipped');
-};
-
-export const isDeliveryResult = (_value: unknown): _value is DeliveryResult => {
-  throw new NotImplementedError('isDeliveryResult');
-};
-
-// ---------------------------------------------------------------- conformance kit
-
-export interface ChannelConformanceFixtures {
-  /** A payload the channel must support and deliver. */
-  payload: NotificationPayload;
-  /** A payload without the channel's address; `supports` must return false. */
-  unaddressable?: NotificationPayload;
-}
-
-/** Problems found with a channel implementation; empty when it conforms. */
-export const checkChannelConformance = async (
-  _channel: NotificationChannel,
-  _fixtures: ChannelConformanceFixtures,
-): Promise<string[]> => {
-  throw new NotImplementedError('checkChannelConformance');
+const deliver = async (channel: NotificationChannel, payload: NotificationPayload): Promise<DeliveryResult> => {
+  const addresses = payload.recipient.addresses[channel.name] ?? [];
+  if (addresses.length === 0) return { status: 'skipped', reason: 'no_address' };
+  try {
+    return await channel.send(payload, addresses);
+  } catch (error) {
+    return { status: 'failed', error: error instanceof Error ? error.message : String(error), retryable: true };
+  }
 };

@@ -49,7 +49,7 @@ Feature folders, each with a module, a controller and a `dto/` folder of validat
 | `src/insights/` | Search, dashboard, notifications feed, reports, export |
 | `src/webhooks/` | Webhook endpoints/deliveries controller and `WebhookDispatcher` (signing, retries, SSRF guard), `verifySignature` for receivers |
 | `src/storage/` | `MemoryStore` (JSON snapshots), `SqliteStore`, `PostgresStore` (+ `migrations/postgres.ts`), `SecretBox` (AES-256-GCM) |
-| `src/notifications/` | `NotificationPayload`, `NotificationChannel` contract + conformance kit, `NotificationManager`, `EmailChannel`, MIME and SMTP client (see [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md)) |
+| `src/notifications/` | `Notifier` + `NotificationChannel` contract, `EmailChannel` (nodemailer `smtpTransport`), `PushChannel` (Web Push, stub); the project-side dispatcher is in `src/decision-log/notifications/` (see [`docs/NOTIFICATIONS.md`](docs/NOTIFICATIONS.md)) |
 | `src/ui/` | Serves the dependency-free web UI from `public/` at `/` |
 | `src/common/` | `DecisionLogError` and the `X-User` guard |
 | `src/helpers/` | Small single-purpose helpers grouped by action (`auth/`, `errors/`, `files/`, `http/`, `routing/`) |
