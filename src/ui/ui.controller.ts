@@ -1,8 +1,9 @@
 import { Controller, Get, HttpCode, Res } from '@nestjs/common';
 import type { Response } from 'express';
+import { join } from 'path';
 import { sendAsset } from '../helpers/files/send-asset';
 
-const PUBLIC_DIR = new URL('../../public/', import.meta.url).pathname;
+const PUBLIC_DIR = join(process.cwd(), 'public');
 
 /** The web UI. Public (no X-User) and whitelisted: only these four paths are served. */
 @Controller()
