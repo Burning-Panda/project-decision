@@ -9,3 +9,16 @@ export class DecisionLogError extends Error {
     this.name = 'DecisionLogError';
   }
 }
+
+export class NotImplementedError extends Error {
+  constructor(message = 'Not implemented') {
+    super(message);
+    this.name = 'NotImplementedError';
+    this.code = 'ERR_NOT_IMPLEMENTED';
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+
+  readonly code: string;
+}
