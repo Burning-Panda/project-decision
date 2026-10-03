@@ -1,5 +1,42 @@
-import { describe, it, expect } from 'bun:test';
-import { setup, draft, proposed, act, expectCode, sha256, U, buildLog, MemoryStore } from './support/index';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import {
+  freshLog, proposedIn, draft, act, attempt, expectCode, sha256, U, buildLog, MemoryStore, type LogHandle,
+} from './support/index';
+
+// Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
+// Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN; when the
+// THEN must also inspect state after the failure, the WHEN runs the action through attempt() instead.
+// THEN may call read-only queries (auditTrail, getDecision, ...) to observe the outcome.
+
+const CONSENSUS = { mode: 'consensus_voting' };
+
+/** Audit entries written before hash versioning: hash = sha256 of the entry in insertion order. */
+function legacyEntries(count: number) {
+  const entries: any[] = [];
+  let prev = '0'.repeat(64);
+  for (let seq = 1; seq <= count; seq++) {
+    const e: any = { seq, at: '2024-01-01T00:00:00.000Z', actor: 'a', action: 'create', decision_id: null, before: null, after: null, ip: null, detail: null, prev_hash: prev };
+    e.hash = sha256(JSON.stringify(e));
+    prev = e.hash;
+    entries.push(e);
+  }
+  return entries;
+}
+
+/** Call inside a describe(): a fresh log whose audit trail is replaced by `count` legacy entries. */
+function legacyChain(count: number) {
+  const h = freshLog();
+  beforeEach(() => {
+    h.log.store.audit.length = 0;
+    h.log.store.audit.push(...legacyEntries(count));
+  });
+  return h;
+}
+
+/** Rewrites every audit entry with its keys in reverse order, as a jsonb store may return them. */
+const reverseKeys = (log: any) => {
+  log.store.audit = log.store.audit.map((e: any) => Object.fromEntries(Object.entries(e).sort(([a], [b]) => (a < b ? 1 : -1))));
+};
 
 describe('outsiders cannot read anything; the org identifier can read everything', () => {
   const reads: Array<[string, (log: any, id: string) => unknown]> = [
@@ -11,373 +48,395 @@ describe('outsiders cannot read anything; the org identifier can read everything
   ];
 
   for (const [name, read] of reads) {
-    describe(`GIVEN a proposed decision`, () => {
+    describe('GIVEN a proposed decision', () => {
+      const h = proposedIn();
+
       describe(`WHEN an outsider calls ${name}`, () => {
-        it(`THEN FORBIDDEN 403`, async () => {
-          const { log } = await setup();
-          const id = proposed(log);
-          expectCode(() => read(log, id), 'FORBIDDEN', 403);
+        let call: () => unknown;
+        beforeEach(() => { call = () => read(h.log, h.id); });
+
+        it('THEN FORBIDDEN 403', () => {
+          expectCode(call, 'FORBIDDEN', 403);
         });
       });
     });
   }
 
   describe('GIVEN a proposed decision', () => {
+    const h = proposedIn();
+
     describe('WHEN the org identifier reads it', () => {
-      it('THEN access is granted', async () => {
-        const { log } = await setup();
-        const id = proposed(log);
-        expect(log.getDecision(id, U.org).id).toBe(id);
+      let d: any;
+      beforeEach(() => { d = h.log.getDecision(h.id, U.org); });
+
+      it('THEN access is granted', () => {
+        expect(d.id).toBe(h.id);
       });
     });
   });
 });
 
 describe('team admins manage membership; plain members cannot', () => {
-  describe('GIVEN a plain member', () => {
+  describe('GIVEN project PRJ in the default team, where bob is a plain member', () => {
+    const h = freshLog();
+
     describe('WHEN bob adds a team member', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        expectCode(() => log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'member', actor: U.bob }), 'FORBIDDEN', 403);
+      let add: () => unknown;
+      beforeEach(() => { add = () => h.log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'member', actor: U.bob }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(add, 'FORBIDDEN', 403);
       });
     });
-  });
 
-  describe('GIVEN the org admin', () => {
-    describe('WHEN a member is added with role king', () => {
-      it('THEN VALIDATION_ERROR 400', async () => {
-        const { log } = await setup();
-        expectCode(() => log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'king', actor: U.org }), 'VALIDATION_ERROR', 400);
+    describe('WHEN the org admin adds a member with role king', () => {
+      let add: () => unknown;
+      beforeEach(() => { add = () => h.log.addTeamMember({ owner: 'acme', team: 'default', user: 'x@acme.com', role: 'king', actor: U.org }); });
+
+      it('THEN VALIDATION_ERROR 400', () => {
+        expectCode(add, 'VALIDATION_ERROR', 400);
       });
     });
-  });
 
-  describe('GIVEN an existing project PRJ', () => {
     describe('WHEN the org admin creates PRJ again', () => {
-      it('THEN CONFLICT 409', async () => {
-        const { log } = await setup();
-        expectCode(() => log.createProject({ owner: 'acme', identifier: 'PRJ', title: 'dup', actor: U.org }), 'CONFLICT', 409);
+      let create: () => unknown;
+      beforeEach(() => { create = () => h.log.createProject({ owner: 'acme', identifier: 'PRJ', title: 'dup', actor: U.org }); });
+
+      it('THEN CONFLICT 409', () => {
+        expectCode(create, 'CONFLICT', 409);
       });
     });
-  });
 
-  describe('GIVEN a plain member', () => {
     describe('WHEN bob creates a project', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        expectCode(() => log.createProject({ owner: 'acme', identifier: 'ZZ', title: 'x', actor: U.bob }), 'FORBIDDEN', 403);
+      let create: () => unknown;
+      beforeEach(() => { create = () => h.log.createProject({ owner: 'acme', identifier: 'ZZ', title: 'x', actor: U.bob }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(create, 'FORBIDDEN', 403);
       });
     });
   });
 });
 
 describe('projects live in a team; decisions are visible only to that team', () => {
-  async function paymentsTeam() {
-    const { log } = await setup();
-    log.createTeam({ owner: 'acme', name: 'payments', actor: U.org });
-    log.addTeamMember({ owner: 'acme', team: 'payments', user: U.bob, role: 'member', actor: U.org });
-    log.createProject({ owner: 'acme', team: 'payments', identifier: 'PAY', title: 'Pay', actor: U.org });
-    return log;
+  /** Call inside a describe(): adds team payments with bob as its only member, and project PAY in it. */
+  function paymentsTeam() {
+    const h = freshLog();
+    beforeEach(() => {
+      h.log.createTeam({ owner: 'acme', name: 'payments', actor: U.org });
+      h.log.addTeamMember({ owner: 'acme', team: 'payments', user: U.bob, role: 'member', actor: U.org });
+      h.log.createProject({ owner: 'acme', team: 'payments', identifier: 'PAY', title: 'Pay', actor: U.org });
+    });
+    return h;
   }
 
   describe('GIVEN a PAY project in team payments', () => {
+    const h = paymentsTeam();
+
     describe('WHEN bob creates a decision', () => {
-      it('THEN it belongs to team payments', async () => {
-        const log = await paymentsTeam();
-        const d = log.createDecision({ project: 'PAY', actor: U.bob, title: 'Use Stripe' });
+      let d: any;
+      beforeEach(() => { d = h.log.createDecision({ project: 'PAY', actor: U.bob, title: 'Use Stripe' }); });
+
+      it('THEN it belongs to team payments', () => {
         expect(d.team).toBe('payments');
+      });
+    });
+
+    describe('WHEN alice (default team) creates a decision in it', () => {
+      let create: () => unknown;
+      beforeEach(() => { create = () => h.log.createDecision({ project: 'PAY', actor: U.alice, title: 'x' }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(create, 'FORBIDDEN', 403);
       });
     });
   });
 
   describe('GIVEN a payments decision', () => {
-    describe('WHEN carol (default team) reads it', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const log = await paymentsTeam();
-        const d = log.createDecision({ project: 'PAY', actor: U.bob, title: 'Use Stripe' });
-        expectCode(() => log.getDecision(d.id, U.carol), 'FORBIDDEN', 403);
-      });
-    });
-  });
+    const h = paymentsTeam();
+    let id: string;
+    beforeEach(() => { id = h.log.createDecision({ project: 'PAY', actor: U.bob, title: 'Use Stripe' }).id; });
 
-  describe('GIVEN the PAY project', () => {
-    describe('WHEN alice (default team) creates a decision in it', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const log = await paymentsTeam();
-        expectCode(() => log.createDecision({ project: 'PAY', actor: U.alice, title: 'x' }), 'FORBIDDEN', 403);
+    describe('WHEN carol (default team) reads it', () => {
+      let read: () => unknown;
+      beforeEach(() => { read = () => h.log.getDecision(id, U.carol); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(read, 'FORBIDDEN', 403);
       });
     });
   });
 });
 
 describe('every action is audited with before/after state, ip and a verifiable hash chain', () => {
-  async function trailAfterCreateProposeApprove() {
-    const { log } = await setup();
-    const d = draft(log);
-    act(log, d.id, U.alice, 'propose', {}, { ip: '10.0.0.1' });
-    act(log, d.id, U.lead, 'approve');
-    return { log, trail: log.auditTrail({ decision_id: d.id }) };
-  }
-
-  describe('GIVEN create, propose and approve', () => {
-    describe('WHEN the decision audit trail is read', () => {
-      it('THEN it lists the three actions in order', async () => {
-        const { trail } = await trailAfterCreateProposeApprove();
-        expect(trail.map((e: any) => e.action)).toEqual(['create', 'propose', 'approve']);
-      });
+  describe('GIVEN a decision created, proposed from 10.0.0.1 and approved', () => {
+    const h = freshLog();
+    let id: string;
+    beforeEach(() => {
+      id = draft(h.log).id;
+      act(h.log, id, U.alice, 'propose', {}, { ip: '10.0.0.1' });
+      act(h.log, id, U.lead, 'approve');
     });
-  });
 
-  describe('GIVEN a propose from 10.0.0.1', () => {
-    describe('WHEN its audit entry is read', () => {
-      it('THEN it carries actor, ip and before/after status', async () => {
-        const { trail } = await trailAfterCreateProposeApprove();
+    describe('WHEN the decision audit trail is read', () => {
+      let trail: any[];
+      beforeEach(() => { trail = h.log.auditTrail({ decision_id: id }); });
+
+      it('THEN it lists the three actions in order', () => {
+        expect(trail.map((e) => e.action)).toEqual(['create', 'propose', 'approve']);
+      });
+
+      it('THEN the propose entry carries actor, ip and before/after status', () => {
         const propose = trail[1];
         expect(propose.actor).toBe(U.alice);
         expect(propose.ip).toBe('10.0.0.1');
         expect(propose.before.status).toBe('draft');
         expect(propose.after.status).toBe('proposed');
       });
-    });
-  });
 
-  describe('GIVEN three audited actions', () => {
-    describe('WHEN entry hashes are inspected', () => {
-      it('THEN each is sha256 and links to the previous hash', async () => {
-        const { trail } = await trailAfterCreateProposeApprove();
+      it('THEN each hash is sha256 and links to the previous hash', () => {
         expect(trail[1].hash).toMatch(/^[0-9a-f]{64}$/);
         expect(trail[1].prev_hash).toBe(trail[0].hash);
       });
     });
+
     describe('WHEN the chain is verified', () => {
-      it('THEN it is intact', async () => {
-        const { log } = await trailAfterCreateProposeApprove();
-        expect(log.verifyAuditChain().ok).toBe(true);
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN it is intact', () => {
+        expect(res.ok).toBe(true);
       });
     });
   });
 });
 
 describe('audit trail filters by actor and detects tampering', () => {
-  describe('GIVEN actions by several actors', () => {
+  describe('GIVEN alice created and proposed a decision after the org set things up', () => {
+    const h = freshLog();
+    beforeEach(() => { act(h.log, draft(h.log).id, U.alice, 'propose'); });
+
     describe('WHEN the trail is filtered by alice', () => {
-      it('THEN exactly her entries return (create and propose)', async () => {
-        // Given
-        const { log } = await setup();
-        const d = draft(log);
-        act(log, d.id, U.alice, 'propose');
-        // When
-        const mine = log.auditTrail({ actor: U.alice });
-        // Then
-        expect(mine.map((e: any) => e.action)).toEqual(['create', 'propose']);
-        expect(mine).toEqual(log.auditTrail({}).filter((e: any) => e.actor === U.alice));
+      let mine: any[];
+      beforeEach(() => { mine = h.log.auditTrail({ actor: U.alice }); });
+
+      it('THEN exactly her entries return (create and propose)', () => {
+        expect(mine.map((e) => e.action)).toEqual(['create', 'propose']);
+        expect(mine).toEqual(h.log.auditTrail({}).filter((e: any) => e.actor === U.alice));
       });
     });
   });
 
   describe('GIVEN an audit entry whose actor was rewritten', () => {
+    const h = freshLog();
+    beforeEach(() => {
+      act(h.log, draft(h.log).id, U.alice, 'propose');
+      h.log.store.audit[1].actor = 'mallory@evil.com';
+    });
+
     describe('WHEN the chain is verified', () => {
-      it('THEN it breaks at that entry', async () => {
-        // Given
-        const { log } = await setup();
-        const d = draft(log);
-        act(log, d.id, U.alice, 'propose');
-        log.store.audit[1].actor = 'mallory@evil.com';
-        // When
-        const res = log.verifyAuditChain();
-        // Then
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN it breaks at that entry', () => {
         expect(res.ok).toBe(false);
-        expect(res.broken_at).toBe(log.store.audit[1].seq);
+        expect(res.broken_at).toBe(h.log.store.audit[1].seq);
       });
     });
   });
 });
 
 describe('failed actions leave state and audit untouched', () => {
-  describe('GIVEN a draft', () => {
+  describe('GIVEN alice\'s draft', () => {
+    const h = freshLog();
+    let id: string;
+    let auditBefore: number;
+    beforeEach(() => {
+      id = draft(h.log).id;
+      auditBefore = h.log.auditTrail({}).length;
+    });
+
     describe('WHEN bob fails to propose it', () => {
-      it('THEN the audit length is unchanged', async () => {
-        // Given
-        const { log } = await setup();
-        const d = draft(log);
-        const before = log.auditTrail({}).length;
-        // When
-        expectCode(() => act(log, d.id, U.bob, 'propose'), 'FORBIDDEN');
-        // Then
-        expect(log.auditTrail({}).length).toBe(before);
+      let error: any;
+      beforeEach(() => { error = attempt(() => act(h.log, id, U.bob, 'propose')); });
+
+      it('THEN it is FORBIDDEN and the audit length is unchanged', () => {
+        expect(error?.code).toBe('FORBIDDEN');
+        expect(h.log.auditTrail({}).length).toBe(auditBefore);
       });
 
-      it('THEN it is still a draft', async () => {
-        const { log } = await setup();
-        const d = draft(log);
-        expectCode(() => act(log, d.id, U.bob, 'propose'), 'FORBIDDEN');
-        expect(log.getDecision(d.id, U.alice).status).toBe('draft');
+      it('THEN it is still a draft', () => {
+        expect(h.log.getDecision(id, U.alice).status).toBe('draft');
       });
     });
   });
 });
 
 describe('idempotency keys make retries safe', () => {
-  const voteOpts = { idempotencyKey: 'vote-alice-prj001' };
+  const VOTE_KEY = { idempotencyKey: 'vote-bob-prj001' };
 
-  async function bobVoted() {
-    const { log } = await setup({ mode: 'consensus_voting' });
-    const id = proposed(log);
-    const first = act(log, id, U.bob, 'vote', { vote: 'approve' }, voteOpts);
-    return { log, id, first };
-  }
+  describe('GIVEN bob\'s vote cast with key K', () => {
+    const h = proposedIn(CONSENSUS);
+    let first: any;
+    beforeEach(() => { first = act(h.log, h.id, U.bob, 'vote', { vote: 'approve' }, VOTE_KEY); });
 
-  describe('GIVEN a vote cast with key K', () => {
     describe('WHEN the same vote is replayed with K', () => {
-      it('THEN it is flagged idempotent_replay with the same tally', async () => {
-        // Given
-        const { log, id, first } = await bobVoted();
-        // When
-        const again = act(log, id, U.bob, 'vote', { vote: 'approve' }, voteOpts);
-        // Then
+      let again: any;
+      beforeEach(() => { again = act(h.log, h.id, U.bob, 'vote', { vote: 'approve' }, VOTE_KEY); });
+
+      it('THEN it is flagged idempotent_replay with the same tally', () => {
         expect(again.idempotent_replay).toBe(true);
         expect(first.idempotent_replay).toBeUndefined();
         expect(again.metadata.vote_tally).toEqual(first.metadata.vote_tally);
       });
-    });
-    describe('WHEN it is replayed', () => {
-      it('THEN only one vote is audited', async () => {
-        // Given
-        const { log, id } = await bobVoted();
-        // When
-        act(log, id, U.bob, 'vote', { vote: 'approve' }, voteOpts);
-        // Then
-        expect(log.auditTrail({ decision_id: id }).filter((e: any) => e.action === 'vote').length).toBe(1);
+
+      it('THEN only one vote is audited', () => {
+        expect(h.log.auditTrail({ decision_id: h.id }).filter((e: any) => e.action === 'vote').length).toBe(1);
       });
     });
   });
 
-  describe('GIVEN a follow-up assigned with key F', () => {
+  describe('GIVEN a follow-up for carol assigned with key F', () => {
+    const h = proposedIn();
+    const assignment = { title: 'once', assigned_to: U.carol };
+    const FOLLOWUP_KEY = { idempotencyKey: 'fu-1' };
+    beforeEach(() => { act(h.log, h.id, U.alice, 'assign_followup', assignment, FOLLOWUP_KEY); });
+
     describe('WHEN the assignment is replayed with F', () => {
-      it('THEN carol has exactly one todo', async () => {
-        // Given
-        const { log } = await setup();
-        const id = proposed(log);
-        const fo = { idempotencyKey: 'fu-1' };
-        const fu = { title: 'once', assigned_to: U.carol };
-        act(log, id, U.alice, 'assign_followup', fu, fo);
-        // When
-        act(log, id, U.alice, 'assign_followup', fu, fo);
-        // Then
-        expect(log.listTodos({ user: U.carol }).total).toBe(1);
+      beforeEach(() => { act(h.log, h.id, U.alice, 'assign_followup', assignment, FOLLOWUP_KEY); });
+
+      it('THEN carol has exactly one todo', () => {
+        expect(h.log.listTodos({ user: U.carol }).total).toBe(1);
       });
     });
   });
 });
 
 describe('state survives a JSON round trip including id counters and audit chain', () => {
-  async function restoredFromJson() {
-    const { log } = await setup();
-    const id = proposed(log);
-    act(log, id, U.lead, 'approve');
-    const json = JSON.parse(JSON.stringify(log.store.toJSON()));
-    const restored = await buildLog({ store: MemoryStore.fromJSON(json), clock: () => new Date('2024-04-01T00:00:00Z') });
-    return { restored, id };
+  const restore = (json: any) => buildLog({ store: MemoryStore.fromJSON(json), clock: () => new Date('2024-04-01T00:00:00Z') });
+
+  /** Call inside a describe(): an approved PRJ-001 whose store is serialised to `json`. */
+  function serialised() {
+    const h = proposedIn() as LogHandle & { id: string; json: any };
+    beforeEach(() => {
+      act(h.log, h.id, U.lead, 'approve');
+      h.json = JSON.parse(JSON.stringify(h.log.store.toJSON()));
+    });
+    return h;
   }
 
   describe('GIVEN a store serialised to JSON', () => {
+    const h = serialised();
+
     describe('WHEN a log is rebuilt from it', () => {
-      it('THEN the decision is still approved', async () => {
-        const { restored, id } = await restoredFromJson();
-        expect(restored.getDecision(id, U.alice).status).toBe('approved');
+      let restored: any;
+      beforeEach(async () => { restored = await restore(h.json); });
+
+      it('THEN the decision is still approved', () => {
+        expect(restored.getDecision(h.id, U.alice).status).toBe('approved');
+      });
+
+      it('THEN the audit chain and integrity both hold', () => {
+        expect(restored.verifyAuditChain().ok).toBe(true);
+        expect(restored.verifyIntegrity(h.id).ok).toBe(true);
       });
     });
   });
 
-  describe('GIVEN a store restored from JSON', () => {
-    describe('WHEN the audit chain and integrity are verified', () => {
-      it('THEN both hold', async () => {
-        const { restored, id } = await restoredFromJson();
-        expect(restored.verifyAuditChain().ok).toBe(true);
-        expect(restored.verifyIntegrity(id).ok).toBe(true);
-      });
-    });
+  describe('GIVEN a log restored from JSON', () => {
+    const h = serialised();
+    let restored: any;
+    beforeEach(async () => { restored = await restore(h.json); });
+
     describe('WHEN a new decision is created', () => {
-      it('THEN the counter continues at PRJ-002', async () => {
-        const { restored } = await restoredFromJson();
-        expect(restored.createDecision({ project: 'PRJ', actor: U.alice, title: 'next' }).id).toBe('PRJ-002');
+      let d: any;
+      beforeEach(() => { d = restored.createDecision({ project: 'PRJ', actor: U.alice, title: 'next' }); });
+
+      it('THEN the counter continues at PRJ-002', () => {
+        expect(d.id).toBe('PRJ-002');
       });
     });
   });
 });
 
 describe('audit hashes do not depend on object key order (stores such as jsonb reorder keys)', () => {
-  async function reordered() {
-    const { log } = await setup();
-    const d = draft(log);
-    act(log, d.id, U.alice, 'propose');
-    return log;
+  /** Call inside a describe(): a fresh log with a decision created and proposed. */
+  function audited() {
+    const h = freshLog();
+    beforeEach(() => { act(h.log, draft(h.log).id, U.alice, 'propose'); });
+    return h;
   }
 
   describe('GIVEN freshly written audit entries', () => {
-    describe('WHEN their hash version is read', () => {
-      it('THEN every entry carries hv 2', async () => {
-        const log = await reordered();
-        expect(log.store.audit.every((e: any) => e.hv === 2)).toBe(true);
+    const h = audited();
+
+    describe('WHEN their hash versions are read', () => {
+      let versions: number[];
+      beforeEach(() => { versions = h.log.store.audit.map((e: any) => e.hv); });
+
+      it('THEN every entry carries hv 2', () => {
+        expect(versions.every((hv) => hv === 2)).toBe(true);
+        expect(versions.length).toBeGreaterThan(0);
       });
     });
   });
 
   describe('GIVEN audit entries whose keys were stored in reverse order', () => {
+    const h = audited();
+    beforeEach(() => { reverseKeys(h.log); });
+
     describe('WHEN the chain is verified', () => {
-      it('THEN it is still valid', async () => {
-        // Given
-        const log = await reordered();
-        log.store.audit = log.store.audit.map((e: any) => Object.fromEntries(Object.entries(e).sort(([a], [b]) => (a < b ? 1 : -1))));
-        // When / Then
-        expect(log.verifyAuditChain().ok).toBe(true);
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN it is still valid', () => {
+        expect(res.ok).toBe(true);
       });
     });
   });
 
   describe('GIVEN reordered entries with a rewritten actor', () => {
+    const h = audited();
+    beforeEach(() => {
+      reverseKeys(h.log);
+      h.log.store.audit[0].actor = 'mallory@evil.com';
+    });
+
     describe('WHEN the chain is verified', () => {
-      it('THEN tampering is still detected', async () => {
-        // Given
-        const log = await reordered();
-        log.store.audit = log.store.audit.map((e: any) => Object.fromEntries(Object.entries(e).sort(([a], [b]) => (a < b ? 1 : -1))));
-        log.store.audit[0].actor = 'mallory@evil.com';
-        // When / Then
-        expect(log.verifyAuditChain().ok).toBe(false);
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN tampering is still detected', () => {
+        expect(res.ok).toBe(false);
       });
     });
   });
 });
 
 describe('chains written before hash versioning (insertion-order hashes) still verify', () => {
-  async function legacyChain() {
-    const { log } = await setup();
-    log.store.audit.length = 0;
-    let prev = '0'.repeat(64);
-    for (let seq = 1; seq <= 3; seq++) {
-      const e: any = { seq, at: '2024-01-01T00:00:00.000Z', actor: 'a', action: 'create', decision_id: null, before: null, after: null, ip: null, detail: null, prev_hash: prev };
-      e.hash = sha256(JSON.stringify(e));
-      prev = e.hash;
-      log.store.audit.push(e);
-    }
-    return log;
-  }
-
   describe('GIVEN a three-entry legacy chain', () => {
+    const h = legacyChain(3);
+
     describe('WHEN it is verified', () => {
-      it('THEN it is ok with no break', async () => {
-        const log = await legacyChain();
-        expect(log.verifyAuditChain()).toEqual({ ok: true, broken_at: null });
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN it is ok with no break', () => {
+        expect(res).toEqual({ ok: true, broken_at: null });
       });
     });
   });
 
   describe('GIVEN a legacy chain with entry 2 altered', () => {
+    const h = legacyChain(3);
+    beforeEach(() => { h.log.store.audit[1].actor = 'mallory'; });
+
     describe('WHEN it is verified', () => {
-      it('THEN it breaks at seq 2', async () => {
-        const log = await legacyChain();
-        log.store.audit[1].actor = 'mallory';
-        expect(log.verifyAuditChain()).toEqual({ ok: false, broken_at: 2 });
+      let res: any;
+      beforeEach(() => { res = h.log.verifyAuditChain(); });
+
+      it('THEN it breaks at seq 2', () => {
+        expect(res).toEqual({ ok: false, broken_at: 2 });
       });
     });
   });
@@ -385,20 +444,17 @@ describe('chains written before hash versioning (insertion-order hashes) still v
 
 describe('new entries can extend a legacy chain', () => {
   describe('GIVEN a one-entry legacy chain', () => {
+    const h = legacyChain(1);
+
     describe('WHEN a new owner is created', () => {
-      it('THEN the new entry is hv 2, linked to the legacy hash, and the chain verifies', async () => {
-        // Given
-        const { log } = await setup();
-        log.store.audit.length = 0;
-        const e: any = { seq: 1, at: '2024-01-01T00:00:00.000Z', actor: 'a', action: 'create', decision_id: null, before: null, after: null, ip: null, detail: null, prev_hash: '0'.repeat(64) };
-        e.hash = sha256(JSON.stringify(e));
-        log.store.audit.push(e);
-        // When
-        log.createOwner({ identifier: 'newco' });
-        // Then
-        expect(log.store.audit.at(-1).hv).toBe(2);
-        expect(log.store.audit.at(-1).prev_hash).toBe(e.hash);
-        expect(log.verifyAuditChain().ok).toBe(true);
+      beforeEach(() => { h.log.createOwner({ identifier: 'newco' }); });
+
+      it('THEN the new entry is hv 2, linked to the legacy hash, and the chain verifies', () => {
+        const legacy = h.log.store.audit[0];
+        const latest = h.log.store.audit.at(-1);
+        expect(latest.hv).toBe(2);
+        expect(latest.prev_hash).toBe(legacy.hash);
+        expect(h.log.verifyAuditChain().ok).toBe(true);
       });
     });
   });

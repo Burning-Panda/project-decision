@@ -62,6 +62,16 @@ export const act = (log: any, id: string, actor: string, action: string, payload
 export const vote = (log: any, id: string, who: string, v: string, comment?: string) =>
   act(log, id, who, 'vote', { vote: v, comment });
 
+/** Runs fn and returns what it threw (undefined if nothing); for a WHEN whose action is expected to fail and leave state behind. */
+export function attempt(fn: () => unknown): any {
+  try {
+    fn();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
+
 /** Asserts that fn throws a DecisionLogError with the given code (and status); returns the error. */
 export function expectCode(fn: () => unknown, code: string, status?: number): any {
   let error: any;
