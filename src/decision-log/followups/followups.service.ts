@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { AssignFollowupPayloadDto } from '../../decisions/dto/actions/assign-followup-payload.dto';
 import type { AddMeetingPayloadDto } from '../../decisions/dto/actions/add-meeting-payload.dto';
 import type { ListTodosQueryDto } from '../../todos/dto/list-todos-query.dto';
@@ -13,10 +13,10 @@ import { DecisionsService } from '../decisions/decisions.service';
 export class FollowupsService {
   constructor(private readonly ctx: LogContext, private readonly decisions: DecisionsService, private readonly audit: AuditService) {}
 
-  addFollowup(_id: string, _actor: string, _input: AssignFollowupPayloadDto): any { return todo('FollowupsService.addFollowup'); }
-  listTodos(_filters: ListTodosQueryDto): any { return todo('FollowupsService.listTodos'); }
-  updateTodo(_todoId: string, _actor: string, _patch: UpdateTodoDto): any { return todo('FollowupsService.updateTodo'); }
-  todoStats(_user: string): any { return todo('FollowupsService.todoStats'); }
-  addMeeting(_id: string, _actor: string, _input: AddMeetingPayloadDto): any { return todo('FollowupsService.addMeeting'); }
-  renderMeetingNotes(_id: string, _actor: string): string { return todo('FollowupsService.renderMeetingNotes'); }
+  addFollowup(_id: string, _actor: string, _input: AssignFollowupPayloadDto): any { throw new NotImplementedError('FollowupsService.addFollowup'); }
+  listTodos(_filters: ListTodosQueryDto): any { throw new NotImplementedError('FollowupsService.listTodos'); }
+  updateTodo(_todoId: string, _actor: string, _patch: UpdateTodoDto): any { throw new NotImplementedError('FollowupsService.updateTodo'); }
+  todoStats(_user: string): any { throw new NotImplementedError('FollowupsService.todoStats'); }
+  addMeeting(_id: string, _actor: string, _input: AddMeetingPayloadDto): any { throw new NotImplementedError('FollowupsService.addMeeting'); }
+  renderMeetingNotes(_id: string, _actor: string): string { throw new NotImplementedError('FollowupsService.renderMeetingNotes'); }
 }

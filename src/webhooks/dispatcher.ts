@@ -1,11 +1,11 @@
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 
 export class WebhookDispatcher {
   constructor(_log: unknown, _options: Record<string, any> = {}) {
-    todo('WebhookDispatcher');
+    throw new NotImplementedError('WebhookDispatcher');
   }
 }
 
 export function verifySignature(_args: Record<string, any>): boolean {
-  return todo('verifySignature');
+  throw new NotImplementedError('verifySignature');
 }

@@ -1,13 +1,13 @@
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 
 export class SecretBox {
   constructor(_options: { keys: Buffer[] }) {
-    todo('SecretBox');
+    throw new NotImplementedError('SecretBox');
   }
   static fromEnv(_env: Record<string, string | undefined> = process.env): SecretBox | null {
-    return todo('SecretBox.fromEnv');
+    throw new NotImplementedError('SecretBox.fromEnv');
   }
   static isEncrypted(_value: unknown): boolean {
-    return todo('SecretBox.isEncrypted');
+    throw new NotImplementedError('SecretBox.isEncrypted');
   }
 }

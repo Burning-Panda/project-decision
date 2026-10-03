@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { CreateDecisionDto } from '../../decisions/dto/create-decision.dto';
 import type { ListDecisionsQueryDto } from '../../decisions/dto/list-decisions-query.dto';
 import type { PerformActionDto } from '../../decisions/dto/perform-action.dto';
@@ -19,21 +19,21 @@ export class DecisionsService {
     private readonly audit: AuditService,
   ) {}
 
-  create(_input: CreateDecisionDto & { actor: string }): any { return todo('DecisionsService.create'); }
-  updateDraft(_id: string, _actor: string, _patch: { title?: string; content?: string }): any { return todo('DecisionsService.updateDraft'); }
-  deleteDraft(_id: string, _actor: string): void { return todo('DecisionsService.deleteDraft'); }
-  get(_id: string, _actor: string): any { return todo('DecisionsService.get'); }
-  list(_filters: ListDecisionsQueryDto): any { return todo('DecisionsService.list'); }
+  create(_input: CreateDecisionDto & { actor: string }): any { throw new NotImplementedError('DecisionsService.create'); }
+  updateDraft(_id: string, _actor: string, _patch: { title?: string; content?: string }): any { throw new NotImplementedError('DecisionsService.updateDraft'); }
+  deleteDraft(_id: string, _actor: string): void { throw new NotImplementedError('DecisionsService.deleteDraft'); }
+  get(_id: string, _actor: string): any { throw new NotImplementedError('DecisionsService.get'); }
+  list(_filters: ListDecisionsQueryDto): any { throw new NotImplementedError('DecisionsService.list'); }
 
   /** The action state machine (propose, approve, vote, ...). */
-  perform(_id: string, _actor: string, _request: PerformActionDto, _opts?: Record<string, any>): any { return todo('DecisionsService.perform'); }
+  perform(_id: string, _actor: string, _request: PerformActionDto, _opts?: Record<string, any>): any { throw new NotImplementedError('DecisionsService.perform'); }
 
   /** Auto-approves proposals past their window; returns what changed. */
-  sweep(): any { return todo('DecisionsService.sweep'); }
+  sweep(): any { throw new NotImplementedError('DecisionsService.sweep'); }
 
-  versions(_id: string, _actor: string): any { return todo('DecisionsService.versions'); }
-  diff(_id: string, _actor: string, _range: DiffQueryDto): any { return todo('DecisionsService.diff'); }
-  verifyIntegrity(_id: string): any { return todo('DecisionsService.verifyIntegrity'); }
-  participants(_id: string, _actor: string): any { return todo('DecisionsService.participants'); }
-  renderDocument(_id: string, _actor: string): string { return todo('DecisionsService.renderDocument'); }
+  versions(_id: string, _actor: string): any { throw new NotImplementedError('DecisionsService.versions'); }
+  diff(_id: string, _actor: string, _range: DiffQueryDto): any { throw new NotImplementedError('DecisionsService.diff'); }
+  verifyIntegrity(_id: string): any { throw new NotImplementedError('DecisionsService.verifyIntegrity'); }
+  participants(_id: string, _actor: string): any { throw new NotImplementedError('DecisionsService.participants'); }
+  renderDocument(_id: string, _actor: string): string { throw new NotImplementedError('DecisionsService.renderDocument'); }
 }

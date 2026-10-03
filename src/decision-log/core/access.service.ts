@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { Team } from '../teams/team';
 
 /** Who may do what. Pure authorization rules; no persistence of its own. */
@@ -7,11 +7,11 @@ import type { Team } from '../teams/team';
 export class AccessService {
   /** The owner identifier acts as organisation admin. */
   isOrgAdmin(_actor: string, _owner: string): boolean {
-    return todo('AccessService.isOrgAdmin');
+    throw new NotImplementedError('AccessService.isOrgAdmin');
   }
 
   /** Org admin, or a team member with role `admin`. */
   isTeamAdmin(_actor: string, _team: Team): boolean {
-    return todo('AccessService.isTeamAdmin');
+    throw new NotImplementedError('AccessService.isTeamAdmin');
   }
 }

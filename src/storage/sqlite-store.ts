@@ -1,7 +1,7 @@
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 
 export class SqliteStore {
   static open(_file: string): SqliteStore {
-    return todo('SqliteStore.open');
+    throw new NotImplementedError('SqliteStore.open');
   }
 }

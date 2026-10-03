@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { CreateOwnerDto } from '../../admin/dto/create-owner.dto';
 import { AuditService } from '../core/audit.service';
 import { LogContext } from '../core/log-context';
@@ -11,12 +11,11 @@ export class OwnersService {
 
   /** Creates the owner and its empty `default` team. INVALID without identifier, CONFLICT if taken. */
   create(_input: CreateOwnerDto): Owner {
-
-    return todo('OwnersService.create');
+    throw new NotImplementedError('OwnersService.create');
   }
 
   /** NOT_FOUND when absent. Shared guard for every service that takes an `owner`. */
   require(_identifier: string): Owner {
-    return todo('OwnersService.require');
+    throw new NotImplementedError('OwnersService.require');
   }
 }

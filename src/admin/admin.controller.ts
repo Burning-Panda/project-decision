@@ -1,6 +1,6 @@
 import { Controller, Body, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { XUserGuard } from '../common/x-user.guard';
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 import { CreateOwnerDto } from './dto/create-owner.dto';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { AddTeamMemberDto } from './dto/add-team-member.dto';
@@ -11,26 +11,26 @@ import { CreateProjectDto } from './dto/create-project.dto';
 export class AdminController {
   @Post('owners')
   createOwner(@Body() body: CreateOwnerDto) {
-    return todo('POST /owners');
+    throw new NotImplementedError('POST /owners');
   }
 
   @Post('teams')
   createTeam(@Body() body: CreateTeamDto) {
-    return todo('POST /teams');
+    throw new NotImplementedError('POST /teams');
   }
 
   @Post('teams/members')
   addTeamMember(@Body() body: AddTeamMemberDto) {
-    return todo('POST /teams/members');
+    throw new NotImplementedError('POST /teams/members');
   }
 
   @Post('projects')
   createProject(@Body() body: CreateProjectDto) {
-    return todo('POST /projects');
+    throw new NotImplementedError('POST /projects');
   }
 
   @Get('projects/:id')
   getProject(@Param('id') id: string) {
-    return todo('GET /projects/:id');
+    throw new NotImplementedError('GET /projects/:id');
   }
 }

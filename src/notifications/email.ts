@@ -1,13 +1,13 @@
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 
 export class EmailChannel {
   constructor(_options: Record<string, any>) {
-    todo('EmailChannel');
+    throw new NotImplementedError('EmailChannel');
   }
 }
 
 export class MemoryMailTransport {
   constructor() {
-    todo('MemoryMailTransport');
+    throw new NotImplementedError('MemoryMailTransport');
   }
 }

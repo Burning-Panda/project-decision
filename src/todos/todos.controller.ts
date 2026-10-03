@@ -1,6 +1,6 @@
 import { Controller, Body, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
 import { XUserGuard } from '../common/x-user.guard';
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 import { ListTodosQueryDto } from './dto/list-todos-query.dto';
 import { UpdateTodoDto } from './dto/update-todo.dto';
 
@@ -9,11 +9,11 @@ import { UpdateTodoDto } from './dto/update-todo.dto';
 export class TodosController {
   @Get()
   list(@Query() query: ListTodosQueryDto) {
-    return todo('GET /todos');
+    throw new NotImplementedError('GET /todos');
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() body: UpdateTodoDto) {
-    return todo('PATCH /todos/:id');
+    throw new NotImplementedError('PATCH /todos/:id');
   }
 }

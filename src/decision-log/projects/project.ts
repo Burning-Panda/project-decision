@@ -1,4 +1,4 @@
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { CreateProjectDto } from '../../admin/dto/create-project.dto';
 import type { ApprovalSettingsDto } from '../../admin/dto/approval-settings.dto';
 
@@ -23,11 +23,11 @@ export interface ProjectRecord {
 export class Project {
   /** Validates the input (identifier, title, settings) and returns a fresh record stamped with `now`. */
   static create(_input: Omit<CreateProjectDto, 'settings'> & { settings?: CreateProjectDto['settings'] }, _now: string): ProjectRecord {
-    return todo('Project.create');
+    throw new NotImplementedError('Project.create');
   }
 
   /** Merges `patch` over `current` approval settings and re-validates; returns the new settings. */
   static resolveSettings(_patch: ApprovalSettingsDto | undefined, _current?: ProjectRecord['approval_settings']): ProjectRecord['approval_settings'] {
-    return todo('Project.resolveSettings');
+    throw new NotImplementedError('Project.resolveSettings');
   }
 }

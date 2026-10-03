@@ -1,6 +1,6 @@
 import { Controller, Body, Get, Put, Query, UseGuards } from '@nestjs/common';
 import { XUserGuard } from '../common/x-user.guard';
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 import { ProfileQueryDto } from './dto/profile-query.dto';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 
@@ -9,11 +9,11 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 export class ProfileController {
   @Get()
   get(@Query() query: ProfileQueryDto) {
-    return todo('GET /profile');
+    throw new NotImplementedError('GET /profile');
   }
 
   @Put()
   set(@Query() query: ProfileQueryDto, @Body() body: UpdateProfileDto) {
-    return todo('PUT /profile');
+    throw new NotImplementedError('PUT /profile');
   }
 }

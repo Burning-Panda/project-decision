@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { UpdateProfileDto } from '../../profile/dto/update-profile.dto';
 import { LogContext } from '../core/log-context';
 
@@ -8,7 +8,7 @@ import { LogContext } from '../core/log-context';
 export class ProfilesService {
   constructor(private readonly ctx: LogContext) {}
 
-  get(_user: string, _actor: string): any { return todo('ProfilesService.get'); }
-  set(_user: string, _actor: string, _input: UpdateProfileDto): any { return todo('ProfilesService.set'); }
-  listNotifications(_user: string): any { return todo('ProfilesService.listNotifications'); }
+  get(_user: string, _actor: string): any { throw new NotImplementedError('ProfilesService.get'); }
+  set(_user: string, _actor: string, _input: UpdateProfileDto): any { throw new NotImplementedError('ProfilesService.set'); }
+  listNotifications(_user: string): any { throw new NotImplementedError('ProfilesService.listNotifications'); }
 }

@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { XUserGuard } from '../common/x-user.guard';
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 import { SearchQueryDto } from './dto/search-query.dto';
 import { ReportQueryDto } from './dto/report-query.dto';
 import { ExportQueryDto } from './dto/export-query.dto';
@@ -10,26 +10,26 @@ import { ExportQueryDto } from './dto/export-query.dto';
 export class InsightsController {
   @Get('search')
   search(@Query() query: SearchQueryDto) {
-    return todo('GET /search');
+    throw new NotImplementedError('GET /search');
   }
 
   @Get('dashboard')
   dashboard() {
-    return todo('GET /dashboard');
+    throw new NotImplementedError('GET /dashboard');
   }
 
   @Get('notifications')
   notifications() {
-    return todo('GET /notifications');
+    throw new NotImplementedError('GET /notifications');
   }
 
   @Get('reports/:type')
   report(@Param('type') type: string, @Query() query: ReportQueryDto) {
-    return todo('GET /reports/:type');
+    throw new NotImplementedError('GET /reports/:type');
   }
 
   @Get('export')
   export(@Query() query: ExportQueryDto) {
-    return todo('GET /export');
+    throw new NotImplementedError('GET /export');
   }
 }

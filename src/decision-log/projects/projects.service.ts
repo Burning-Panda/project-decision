@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo';
+import { NotImplementedError } from '../../common/errors';
 import type { CreateProjectDto } from '../../admin/dto/create-project.dto';
 import type { ProjectSettingsDto } from '../../admin/dto/project-settings.dto';
 import { AccessService } from '../core/access.service';
@@ -19,16 +19,16 @@ export class ProjectsService {
 
   /** Team admin only. Builds via `Project.create`, then CONFLICT on a duplicate identifier, persists, audits. */
   create(_input: CreateProjectDto & { actor: string }): ProjectRecord {
-    return todo('ProjectsService.create');
+    throw new NotImplementedError('ProjectsService.create');
   }
 
   /** NOT_FOUND when absent. */
   get(_identifier: string): ProjectRecord {
-    return todo('ProjectsService.get');
+    throw new NotImplementedError('ProjectsService.get');
   }
 
   /** Team admin only. */
   updateSettings(_identifier: string, _actor: string, _settings: ProjectSettingsDto): ProjectRecord {
-    return todo('ProjectsService.updateSettings');
+    throw new NotImplementedError('ProjectsService.updateSettings');
   }
 }

@@ -1,4 +1,4 @@
-import { todo } from '../helpers/errors/todo';
+import { NotImplementedError } from '../common/errors';
 
 export class SmtpError extends Error {
   code: number | null = null;
@@ -7,11 +7,11 @@ export class SmtpError extends Error {
 
 export class SmtpTransport {
   constructor(_options: Record<string, any>) {
-    todo('SmtpTransport');
+    throw new NotImplementedError('SmtpTransport');
   }
   send(_message: Record<string, any>): Promise<any> {
-    return todo('SmtpTransport.send');
+    throw new NotImplementedError('SmtpTransport.send');
   }
 }
 
-export const parseSmtpUrl = (_url: string): Record<string, any> => todo('parseSmtpUrl');
+export const parseSmtpUrl = (_url: string): Record<string, any> => throw new NotImplementedError('parseSmtpUrl');
