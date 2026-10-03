@@ -20,6 +20,14 @@ It runs every spec once, finds the first step that is not finished, and shows yo
 
 If something you change breaks an earlier step, `bun run learn` says so and sends you back there first.
 
+## When you are stuck
+
+1. Read the failing test's name: GIVEN (the state) > WHEN (the action) > THEN (what must be true).
+2. Read the "What this usually means" note under the failure.
+3. Run `bun run learn hint`, more than once if needed. Hints go from "what the test wants" to "where to look", "a plan" and finally "almost the answer" (code with blanks).
+4. Read the concept the brief links to. `learn/concepts/` explains the ideas the steps use, in plain words with small examples:
+   reading test output, HTTP, errors, objects and copies, regex, JSON, async/await, Maps/arrays/records, classes, services and dependency injection, dates and the clock, SQL and migrations, hashing, state machines, permissions, and a glossary of the domain words.
+
 ## Rules of the house
 
 - **Do not edit the specs** in `test/`. They are the requirements. If you think one is wrong, ask.

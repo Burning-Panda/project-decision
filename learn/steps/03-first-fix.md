@@ -7,7 +7,7 @@ The web page loads a script from `/app.js`, but that request returns 404. Find o
 ## You'll learn
 
 - Reading a failing test and its output (see `learn/concepts/reading-test-output.md`)
-- How a Nest controller maps a URL path to a function (`@Get('path')`)
+- How a Nest controller maps a URL path to a function (`@Get('path')`), and what status codes mean → `learn/concepts/http-basics.md`
 - The loop you will repeat in every step: red → change → green
 
 ## Where

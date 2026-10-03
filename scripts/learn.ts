@@ -222,6 +222,9 @@ async function diagnose(output: string): Promise<string[]> {
   if (/Expected:[^\n]*\n\s*Received: undefined/.test(text)) {
     out.push('Your code returned nothing (`undefined`). Did you forget a `return`, or read a property that does not exist?');
   }
+  if (/Expected: not /.test(text)) {
+    out.push('A value was expected to change, but it equals the earlier one. If the test kept an object your code returned earlier, you probably returned the stored object itself, so it changed along with it: return a copy (`structuredClone`).');
+  }
   if (/Expected: (true|false)\s*\n\s*Received: (true|false)/.test(text)) {
     out.push('A yes/no check came out the other way. Read the THEN title: it says which condition must hold.');
   }
