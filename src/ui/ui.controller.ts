@@ -1,9 +1,10 @@
 import { Controller, Get, HttpCode, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { join } from 'path';
+import { fileURLToPath } from 'url';
 import { sendAsset } from '../helpers/files/send-asset';
 
-const PUBLIC_DIR = join(process.cwd(), 'public/');
+// Relative to this file, so it works from src/ and from the build (dist/ui/ is at the same depth) whatever the working directory.
+const PUBLIC_DIR = fileURLToPath(new URL('../../public/', import.meta.url));
 
 /** The web UI. Public (no X-User) and whitelisted: only these four paths are served. */
 @Controller()
