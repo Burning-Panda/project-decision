@@ -1,49 +1,88 @@
-import { describe, it, expect } from 'bun:test';
-import { setup, draft, proposed, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from './support/index';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { freshLog, proposedIn, draft, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from './support/index';
+
+// Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
+// Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.
+// THEN may call read-only queries (getDecision, getVersions, ...) to observe the outcome.
+
+const CONSENSUS = { mode: 'consensus_voting' };
+
+type Reworked = ReturnType<typeof proposedIn> & { v1Hash: string };
+
+/** Call inside a describe(): PRJ-001 proposed, sent back for revision a day later and reworked to CONTENT_V2. */
+function reworked(): Reworked {
+  const h = proposedIn() as Reworked;
+  beforeEach(() => {
+    h.v1Hash = h.log.getDecision(h.id, U.alice).content_hash;
+    h.clock.advanceDays(1);
+    act(h.log, h.id, U.lead, 'request_revision', { reason: 'Need rollback plan' });
+    h.log.updateDraft(h.id, U.alice, { content: CONTENT_V2 });
+  });
+  return h;
+}
+
+/** Call inside a describe(): as reworked(), then re-proposed as revision 2. */
+function secondRevision(): Reworked {
+  const h = reworked();
+  beforeEach(() => { act(h.log, h.id, U.alice, 'propose'); });
+  return h;
+}
 
 describe('request_revision needs a reason and a proposed decision; returns 201 with a draft', () => {
   describe('GIVEN a draft', () => {
+    const h = freshLog();
+    let id: string;
+    beforeEach(() => { id = draft(h.log).id; });
+
     describe('WHEN the lead requests a revision', () => {
-      it('THEN INVALID_STATE 409', async () => {
-        const { log } = await setup();
-        const d = draft(log);
-        expectCode(() => act(log, d.id, U.lead, 'request_revision', { reason: 'x' }), 'INVALID_STATE', 409);
+      let request: () => unknown;
+      beforeEach(() => { request = () => act(h.log, id, U.lead, 'request_revision', { reason: 'x' }); });
+
+      it('THEN INVALID_STATE 409', () => {
+        expectCode(request, 'INVALID_STATE', 409);
       });
     });
   });
 
   describe('GIVEN a proposed decision', () => {
+    const h = proposedIn();
+
     describe('WHEN the lead requests a revision without a reason', () => {
-      it('THEN VALIDATION_ERROR 400', async () => {
-        const { log } = await setup();
-        const id = proposed(log);
-        expectCode(() => act(log, id, U.lead, 'request_revision'), 'VALIDATION_ERROR', 400);
+      let request: () => unknown;
+      beforeEach(() => { request = () => act(h.log, h.id, U.lead, 'request_revision'); });
+
+      it('THEN VALIDATION_ERROR 400', () => {
+        expectCode(request, 'VALIDATION_ERROR', 400);
       });
     });
+
     describe('WHEN an outsider requests a revision', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        const id = proposed(log);
-        expectCode(() => act(log, id, U.outsider, 'request_revision', { reason: 'x' }), 'FORBIDDEN', 403);
+      let request: () => unknown;
+      beforeEach(() => { request = () => act(h.log, h.id, U.outsider, 'request_revision', { reason: 'x' }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(request, 'FORBIDDEN', 403);
       });
     });
+
     describe('WHEN its owner requests a revision', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        const id = proposed(log);
-        expectCode(() => act(log, id, U.alice, 'request_revision', { reason: 'x' }), 'FORBIDDEN', 403);
+      let request: () => unknown;
+      beforeEach(() => { request = () => act(h.log, h.id, U.alice, 'request_revision', { reason: 'x' }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(request, 'FORBIDDEN', 403);
       });
     });
+
     describe('WHEN the lead requests a revision with a reason', () => {
-      it('THEN 201, the decision is a draft and revision 1 records reason and requester', async () => {
-        // Given
-        const { log } = await setup();
-        const id = proposed(log);
-        // When
-        const r = act(log, id, U.lead, 'request_revision', {
+      let r: any;
+      beforeEach(() => {
+        r = act(h.log, h.id, U.lead, 'request_revision', {
           reason: 'Need clarification on rollback plan', suggested_changes: 'Add rollback section',
         });
-        // Then
+      });
+
+      it('THEN 201, the decision is a draft and revision 1 records reason and requester', () => {
         expect(r.status_code).toBe(201);
         expect(r.decision.status).toBe('draft');
         expect(r.data.revision.revision_number).toBe(1);
@@ -55,50 +94,43 @@ describe('request_revision needs a reason and a proposed decision; returns 201 w
 });
 
 describe('revision cycle keeps every version immutable and reachable', () => {
-  async function secondRevision() {
-    const { log, clock } = await setup();
-    const id = proposed(log);
-    const v1Hash = log.getDecision(id, U.alice).content_hash;
-    clock.advanceDays(1);
-    act(log, id, U.lead, 'request_revision', { reason: 'Need rollback plan' });
-    log.updateDraft(id, U.alice, { content: CONTENT_V2 });
-    const r = act(log, id, U.alice, 'propose');
-    return { log, id, v1Hash, r };
-  }
+  describe('GIVEN a revision was requested a day later and the content reworked', () => {
+    const h = reworked();
 
-  describe('GIVEN a revision was requested and content reworked', () => {
     describe('WHEN the owner re-proposes', () => {
-      it('THEN it is revision 2 with a new hash', async () => {
-        const { r, v1Hash } = await secondRevision();
+      let r: any;
+      beforeEach(() => { r = act(h.log, h.id, U.alice, 'propose'); });
+
+      it('THEN it is revision 2 with a new hash', () => {
         expect(r.decision.current_revision).toBe(2);
-        expect(r.decision.content_hash).not.toBe(v1Hash);
+        expect(r.decision.content_hash).not.toBe(h.v1Hash);
       });
     });
   });
 
   describe('GIVEN two proposals', () => {
+    const h = secondRevision();
+
     describe('WHEN versions are read', () => {
-      it('THEN two exist', async () => {
-        const { log, id } = await secondRevision();
-        expect(log.getVersions(id, U.alice).length).toBe(2);
+      let versions: any[];
+      beforeEach(() => { versions = h.log.getVersions(h.id, U.alice); });
+
+      it('THEN two exist', () => {
+        expect(versions.length).toBe(2);
       });
-    });
-    describe('WHEN version 1 is read', () => {
-      it('THEN it keeps the original content and hash, outcome and reason, and is not current', async () => {
-        const { log, id, v1Hash } = await secondRevision();
-        const v1 = log.getVersions(id, U.alice)[0];
+
+      it('THEN version 1 keeps the original content and hash, outcome and reason, and is not current', () => {
+        const v1 = versions[0];
         expect(v1.version).toBe(1);
         expect(v1.content).toBe(CONTENT_V1);
-        expect(v1.content_hash).toBe(v1Hash);
+        expect(v1.content_hash).toBe(h.v1Hash);
         expect(v1.outcome).toBe('revision_requested');
         expect(v1.reason).toBe('Need rollback plan');
         expect(v1.current).toBe(false);
       });
-    });
-    describe('WHEN version 2 is read', () => {
-      it('THEN it holds the new content, has no outcome and is current', async () => {
-        const { log, id } = await secondRevision();
-        const v2 = log.getVersions(id, U.alice)[1];
+
+      it('THEN version 2 holds the new content, has no outcome and is current', () => {
+        const v2 = versions[1];
         expect(v2.content).toBe(CONTENT_V2);
         expect(v2.outcome).toBe(null);
         expect(v2.current).toBe(true);
@@ -108,56 +140,51 @@ describe('revision cycle keeps every version immutable and reachable', () => {
 });
 
 describe('diff groups changes by section path and accepts "v1" style refs', () => {
-  async function twoVersions() {
-    const { log } = await setup();
-    const id = proposed(log);
-    act(log, id, U.lead, 'request_revision', { reason: 'timeline' });
-    log.updateDraft(id, U.alice, { content: CONTENT_V2 });
-    act(log, id, U.alice, 'propose');
-    return { log, id };
-  }
-
   describe('GIVEN versions 1 and 2', () => {
+    const h = secondRevision();
+
     describe('WHEN bob diffs v1 to v2', () => {
-      it('THEN from and to resolve to 1 and 2', async () => {
-        const { log, id } = await twoVersions();
-        const diff = log.diff(id, U.bob, { from: 'v1', to: 'v2' });
+      let diff: any;
+      beforeEach(() => { diff = h.log.diff(h.id, U.bob, { from: 'v1', to: 'v2' }); });
+
+      it('THEN from and to resolve to 1 and 2', () => {
         expect(diff.from).toBe(1);
         expect(diff.to).toBe(2);
       });
-    });
-    describe('WHEN diffed', () => {
-      it('THEN the Decision section lists the removed and added lines', async () => {
-        const { log, id } = await twoVersions();
-        const decision = log.diff(id, U.bob, { from: 'v1', to: 'v2' }).changes.find((c: any) => c.section === 'Decision');
+
+      it('THEN the Decision section lists the removed and added lines', () => {
+        const decision = diff.changes.find((c: any) => c.section === 'Decision');
         expect(decision.removed).toEqual(['Move to PostgreSQL 16 and deprecate MySQL']);
         expect(decision.added).toEqual(['Move to PostgreSQL 16 within 90 days, maintain MySQL fallback for 30 days']);
       });
 
-      it('THEN nested sections use a path and unchanged sections are omitted', async () => {
-        const { log, id } = await twoVersions();
-        const diff = log.diff(id, U.bob, { from: 'v1', to: 'v2' });
+      it('THEN nested sections use a path and unchanged sections are omitted', () => {
         const neg = diff.changes.find((c: any) => c.section === 'Consequences > Negative');
         expect(neg.removed.length).toBe(1);
         expect(neg.added.length).toBe(1);
         expect(diff.changes.some((c: any) => c.section === 'Context')).toBe(false);
       });
 
-      it('THEN stats total two added and two removed lines', async () => {
-        const { log, id } = await twoVersions();
-        expect(log.diff(id, U.bob, { from: 'v1', to: 'v2' }).stats).toEqual({ added: 2, removed: 2 });
+      it('THEN stats total two added and two removed lines', () => {
+        expect(diff.stats).toEqual({ added: 2, removed: 2 });
       });
     });
+
     describe('WHEN a version is diffed against itself', () => {
-      it('THEN there are no changes', async () => {
-        const { log, id } = await twoVersions();
-        expect(log.diff(id, U.bob, { from: 2, to: 2 }).changes).toEqual([]);
+      let diff: any;
+      beforeEach(() => { diff = h.log.diff(h.id, U.bob, { from: 2, to: 2 }); });
+
+      it('THEN there are no changes', () => {
+        expect(diff.changes).toEqual([]);
       });
     });
+
     describe('WHEN diffing to version 9', () => {
-      it('THEN NOT_FOUND 404', async () => {
-        const { log, id } = await twoVersions();
-        expectCode(() => log.diff(id, U.bob, { from: 1, to: 9 }), 'NOT_FOUND', 404);
+      let compare: () => unknown;
+      beforeEach(() => { compare = () => h.log.diff(h.id, U.bob, { from: 1, to: 9 }); });
+
+      it('THEN NOT_FOUND 404', () => {
+        expectCode(compare, 'NOT_FOUND', 404);
       });
     });
   });
@@ -165,18 +192,18 @@ describe('diff groups changes by section path and accepts "v1" style refs', () =
 
 describe('votes are scoped to a revision and reset on re-proposal by default', () => {
   describe('GIVEN two approvals and a revision request', () => {
+    const h = proposedIn(CONSENSUS);
+    beforeEach(() => {
+      act(h.log, h.id, U.bob, 'vote', { vote: 'approve' });
+      act(h.log, h.id, U.carol, 'vote', { vote: 'approve' });
+      act(h.log, h.id, U.lead, 'request_revision', { reason: 'tighten scope' });
+    });
+
     describe('WHEN the owner re-proposes', () => {
-      it('THEN votes and tally are reset', async () => {
-        // Given
-        const { log } = await setup({ mode: 'consensus_voting' });
-        const id = proposed(log);
-        act(log, id, U.bob, 'vote', { vote: 'approve' });
-        act(log, id, U.carol, 'vote', { vote: 'approve' });
-        act(log, id, U.lead, 'request_revision', { reason: 'tighten scope' });
-        // When
-        act(log, id, U.alice, 'propose');
-        // Then
-        const d = log.getDecision(id, U.alice);
+      beforeEach(() => { act(h.log, h.id, U.alice, 'propose'); });
+
+      it('THEN votes and tally are reset', () => {
+        const d = h.log.getDecision(h.id, U.alice);
         expect(d.votes.length).toBe(0);
         expect(d.vote_tally.approve).toBe(0);
       });
@@ -185,30 +212,39 @@ describe('votes are scoped to a revision and reset on re-proposal by default', (
 });
 
 describe('with revision_vote_resets_count=false approvals carry over', () => {
-  async function carriedOver() {
-    const { log } = await setup({ mode: 'consensus_voting', revision_vote_resets_count: false });
-    const id = proposed(log);
-    act(log, id, U.bob, 'vote', { vote: 'approve' });
-    act(log, id, U.carol, 'vote', { vote: 'approve' });
-    act(log, id, U.lead, 'request_revision', { reason: 'tighten scope' });
-    act(log, id, U.alice, 'propose');
-    return { log, id };
+  /** Two approvals, a revision request, with votes carried over the revision. */
+  function twoApprovalsThenRevision() {
+    const h = proposedIn({ ...CONSENSUS, revision_vote_resets_count: false });
+    beforeEach(() => {
+      act(h.log, h.id, U.bob, 'vote', { vote: 'approve' });
+      act(h.log, h.id, U.carol, 'vote', { vote: 'approve' });
+      act(h.log, h.id, U.lead, 'request_revision', { reason: 'tighten scope' });
+    });
+    return h;
   }
 
-  describe('GIVEN revision_vote_resets_count=false', () => {
+  describe('GIVEN revision_vote_resets_count=false, two approvals and a revision request', () => {
+    const h = twoApprovalsThenRevision();
+
     describe('WHEN the owner re-proposes', () => {
-      it('THEN both approvals are kept', async () => {
-        const { log, id } = await carriedOver();
-        expect(log.getDecision(id, U.alice).vote_tally.approve).toBe(2);
+      beforeEach(() => { act(h.log, h.id, U.alice, 'propose'); });
+
+      it('THEN both approvals are kept', () => {
+        expect(h.log.getDecision(h.id, U.alice).vote_tally.approve).toBe(2);
       });
     });
   });
 
-  describe('GIVEN two carried-over approvals', () => {
+  describe('GIVEN two carried-over approvals on the re-proposed decision', () => {
+    const h = twoApprovalsThenRevision();
+    beforeEach(() => { act(h.log, h.id, U.alice, 'propose'); });
+
     describe('WHEN david approves', () => {
-      it('THEN the decision is approved', async () => {
-        const { log, id } = await carriedOver();
-        expect(act(log, id, U.david, 'vote', { vote: 'approve' }).decision.status).toBe('approved');
+      let r: any;
+      beforeEach(() => { r = act(h.log, h.id, U.david, 'vote', { vote: 'approve' }); });
+
+      it('THEN the decision is approved', () => {
+        expect(r.decision.status).toBe('approved');
       });
     });
   });

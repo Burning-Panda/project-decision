@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { freshLog, proposed, act, vote, expectCode, U, type LogHandle } from './support/index';
+import { freshLog, proposedIn, proposed, act, vote, expectCode, U } from './support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.
@@ -9,13 +9,6 @@ import { freshLog, proposed, act, vote, expectCode, U, type LogHandle } from './
 const CONSENSUS = { mode: 'consensus_voting' };
 const QUORUM_50 = { mode: 'quorum', quorum_percentage: 50, quorum_majority_type: 'simple' };
 const VETO_7_DAYS = { mode: 'veto', auto_approve_after_days: 7 };
-
-/** A fresh log with these approval settings and PRJ-001 proposed by alice; `id` is set before each test. */
-function proposedIn(settings?: Record<string, any>) {
-  const h = freshLog(settings) as LogHandle & { id: string };
-  beforeEach(() => { h.id = proposed(h.log); });
-  return h;
-}
 
 describe('project settings are merged over documented defaults', () => {
   describe('GIVEN a project created with mode consensus_voting', () => {

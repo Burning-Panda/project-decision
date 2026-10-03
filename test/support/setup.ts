@@ -43,6 +43,13 @@ export function freshLog(settings?: Record<string, any>): LogHandle {
 export const draft = (log: any, over: Record<string, any> = {}) =>
   log.createDecision({ project: 'PRJ', actor: U.alice, title: 'Migrate to new database', content: CONTENT_V1, ...over });
 
+/** Call inside a describe(): like freshLog, plus PRJ-001 proposed by alice; `id` is set before each test. */
+export function proposedIn(settings?: Record<string, any>): LogHandle & { id: string } {
+  const h = freshLog(settings) as LogHandle & { id: string };
+  beforeEach(() => { h.id = proposed(h.log); });
+  return h;
+}
+
 export function proposed(log: any, over: Record<string, any> = {}) {
   const d = draft(log, over);
   log.perform(d.id, over.actor ?? U.alice, { action: 'propose', payload: {} });
