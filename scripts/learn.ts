@@ -91,16 +91,17 @@ async function runAll(): Promise<Results> {
 
 // ---------------------------------------------------------------- steps
 type Status = 'done' | 'todo' | 'skipped' | 'empty';
-interface StepResult extends Tally { status: Status }
+interface StepResult extends Tally { status: Status; sections: SectionResult[] }
+interface SectionResult extends Tally { file: string; section: string }
 
 async function sectionsFor(spec: StepSpec) { return spec.sections ?? (await sectionsOf(spec.file)); }
 
 async function evaluate(step: Step, results: Results): Promise<StepResult> {
-  const total: StepResult = { pass: 0, fail: 0, skip: 0, status: 'todo' };
+  const total: StepResult = { pass: 0, fail: 0, skip: 0, status: 'todo', sections: [] };
   for (const spec of step.specs) {
     for (const section of await sectionsFor(spec)) {
-      const t = results.get(key(spec.file, section));
-      if (!t) continue;
+      const t = results.get(key(spec.file, section)) ?? { pass: 0, fail: 0, skip: 0 };
+      total.sections.push({ file: spec.file, section, ...t });
       total.pass += t.pass; total.fail += t.fail; total.skip += t.skip;
       total.firstFailure ??= t.firstFailure;
     }
@@ -111,6 +112,9 @@ async function evaluate(step: Step, results: Results): Promise<StepResult> {
   else if (total.fail === 0 && total.skip === 0) total.status = 'done';
   return total;
 }
+
+/** The section to work on: the first one, in the step's order, that has a failing (or no) test. */
+const currentSection = (r: StepResult) => r.sections.find((s) => s.fail > 0 || s.pass + s.fail + s.skip === 0);
 
 async function evaluateAll() {
   const results = await runAll();
@@ -128,11 +132,116 @@ const findStep = (ref: string) => {
 // ---------------------------------------------------------------- briefs
 const briefPath = (step: Step) => `learn/steps/${step.id}.md`;
 
-async function brief(step: Step) {
+interface Rung { title: string; body: string }
+interface Brief { goal: string; mistakes: string; general: string[]; sections: Map<string, Rung[]> }
+
+/**
+ * A brief's `## Hints` holds either `### Section: <exact section title>` blocks, each with `#### <rung title>` rungs
+ * (what the test wants, where, plan, skeleton), or plain `### Hint N` blocks for the whole step.
+ */
+async function brief(step: Step): Promise<Brief> {
   const text = await Bun.file(ROOT + briefPath(step)).text().catch(() => '');
-  const section = (title: string) => text.split(new RegExp(`^## ${title}\\s*$`, 'm'))[1]?.split(/^## /m)[0]?.trim() ?? '';
-  const hints = section('Hints').split(/^### .*$/m).slice(1).map((h) => h.trim()).filter(Boolean); // [0] is the intro line
-  return { goal: section('Goal'), hints };
+  const part = (title: string) => text.split(new RegExp(`^## ${title}\\s*$`, 'm'))[1]?.split(/^## /m)[0]?.trim() ?? '';
+  const general: string[] = [];
+  const sections = new Map<string, Rung[]>();
+  for (const block of part('Hints').split(/^### /m).slice(1)) {
+    const [heading = '', ...rest] = block.split('\n');
+    const body = rest.join('\n');
+    const title = heading.match(/^Section:\s*(.+?)\s*$/)?.[1];
+    if (!title) { general.push(body.trim()); continue; }
+    const rungs = body.split(/^#### /m).slice(1).map((r) => {
+      const [t = '', ...b] = r.split('\n');
+      return { title: t.trim(), body: b.join('\n').trim() };
+    });
+    sections.set(title, rungs);
+  }
+  return { goal: part('Goal'), mistakes: part('Common mistakes'), general, sections };
+}
+
+// ---------------------------------------------------------------- diagnosis
+let stubIndex: Map<string, string> | undefined;
+
+/** Where each `throw new NotImplementedError('X')` lives, so a failure can point at the exact line. */
+async function stubLocation(name: string): Promise<string | undefined> {
+  if (!stubIndex) {
+    stubIndex = new Map();
+    for (const file of new Bun.Glob('src/**/*.ts').scanSync(ROOT)) {
+      const lines = (await Bun.file(ROOT + file).text()).split('\n');
+      lines.forEach((line, i) => {
+        const m = line.match(/NotImplementedError\(['`]([^'`]+)['`]\)/);
+        if (m && !stubIndex!.has(m[1]!)) stubIndex!.set(m[1]!, `${file}:${i + 1}`);
+      });
+    }
+  }
+  return stubIndex.get(name);
+}
+
+const STATUS_MEANING: Record<string, string> = {
+  '400': 'the request was rejected as invalid (a validation error).',
+  '401': 'the caller was not identified (no usable X-User header).',
+  '403': 'the caller was identified but not allowed.',
+  '404': 'nothing matched: an unknown route, or an id that does not exist.',
+  '409': 'a conflict with the current state (a duplicate, or the wrong state for this action).',
+  '500': 'the server threw an error. Look for the error printed above; often a stub or a bug behind the endpoint.',
+};
+
+/** Plain-language explanations of the failure in `output` (bun's test output), most specific first. */
+async function diagnose(output: string): Promise<string[]> {
+  const text = output.replace(/\x1b\[[0-9;]*m/g, '');
+  const out: string[] = [];
+  let m: RegExpMatchArray | null;
+
+  if (/setup\(\): building the owner\/team\/project fixture failed/.test(text)) {
+    out.push('The shared test fixture (owner acme, its default team, project PRJ) could not be built, so an earlier step is broken. Fix the steps it names first (owners, teams, projects).');
+  }
+  if ((m = text.match(/NotImplementedError: (?:TODO: )?([^\n]+)/))) {
+    const name = m[1]!.trim();
+    const where = await stubLocation(name);
+    out.push(`\`${name}\` still throws its placeholder${where ? ` (${where})` : ''}. Replace the \`throw new NotImplementedError(...)\` line with your implementation.`);
+  }
+  if ((m = text.match(/expected error (\w+) but nothing was thrown/))) {
+    out.push(`The test expected your code to refuse this with code ${m[1]}, but nothing was thrown. Add a check that throws \`new DecisionLogError('${m[1]}', 'what went wrong', status)\`.`);
+  } else if ((m = text.match(/expected (\w+), got (\w+): ([^\n]*)/)) && m[2] !== 'ERR_NOT_IMPLEMENTED') {
+    out.push(`Your code threw ${m[2]} ("${m[3]!.trim()}") but the test wants ${m[1]}. Usually the checks run in the wrong order, or the wrong code is used.`);
+  }
+  if ((m = text.match(/Expected: (\d{3})\s*\n\s*Received: (\d{3})/))) {
+    out.push(`The HTTP status was ${m[2]} instead of ${m[1]}. ${m[2]} means ${STATUS_MEANING[m[2]!] ?? 'see the error above.'}`);
+  }
+  if (/Received function did not throw/.test(text)) {
+    out.push('The test expected this call to throw an error, but it returned normally. Add the check (validation, permission, state) that should reject it.');
+  }
+  if ((m = text.match(/undefined is not an object \(evaluating '([^']+)'\)|Cannot read propert(?:y|ies) of undefined \(reading '([^']+)'\)/))) {
+    const expr = m[1] ?? m[2]!;
+    out.push(/store/.test(expr)
+      ? `\`${expr}\`: something on the store is undefined. If it is a collection, add its name to the lists in src/storage/store.ts (and a migration).`
+      : `\`${expr}\`: the part before the last dot is undefined. Did a function return nothing, or is a property spelled differently?`);
+  }
+  if ((m = text.match(/(\S+) is not a function/))) {
+    out.push(`\`${m[1]}\` is not a function: the method does not exist (yet) or is spelled differently from what the test calls.`);
+  }
+  if (/Expected:[^\n]*\n\s*Received: undefined/.test(text)) {
+    out.push('Your code returned nothing (`undefined`). Did you forget a `return`, or read a property that does not exist?');
+  }
+  if (/Expected: (true|false)\s*\n\s*Received: (true|false)/.test(text)) {
+    out.push('A yes/no check came out the other way. Read the THEN title: it says which condition must hold.');
+  }
+  if (/- Expected\s*\n\s*\+ Received/.test(text)) {
+    out.push('Read the diff: lines starting with `-` are what the test expected, `+` what your code produced. Only those lines differ.');
+  }
+  if (/Expected (?:pattern|substring)/.test(text)) {
+    out.push('Your text does not match the expected pattern. Compare the pattern with the received text character by character (spaces, colons, capitals).');
+  }
+  if (/Unhandled error between tests/.test(text)) {
+    out.push('The error happened while preparing the test (a beforeEach: the GIVEN or WHEN), not in the THEN. The stack trace shows where.');
+  }
+  if (/timed out after/i.test(text)) {
+    out.push('The test waited too long: a promise was never resolved or awaited, or a loop never ends.');
+  }
+  if ((m = text.match(/Cannot find module '([^']+)'/))) out.push(`An import cannot be found: \`${m[1]}\`. Check the relative path and the file name.`);
+  if (/SyntaxError|Expected "[^"]+" but found/.test(text)) {
+    out.push('A file could not be read at all: a syntax error. Look at the file and line in the message (often a missing bracket, comma or quote).');
+  }
+  return out.slice(0, 3);
 }
 
 // ---------------------------------------------------------------- output
@@ -142,21 +251,38 @@ function header(index: number, result?: StepResult) {
   console.log(bold(`Step ${index} of ${STEPS.length - 1} — ${step.title}`));
   if (step.edit.length) console.log(`${dim('Edit: ')} ${step.edit.join(', ')}`);
   console.log(`${dim('Brief:')} ${briefPath(step)}`);
-  console.log(`${dim('Specs:')} ${step.specs.map((s) => s.file + (s.sections ? ` (${s.sections.length} section${s.sections.length > 1 ? 's' : ''})` : '')).join(', ')}`);
   if (result) console.log(`${dim('Tests:')} ${result.pass} of ${result.pass + result.fail + result.skip} pass`);
+}
+
+function sectionList(result: StepResult, now?: SectionResult) {
+  if (result.sections.length < 2) return;
+  console.log(dim('\nSections in this step:'));
+  for (const s of result.sections) {
+    const total = s.pass + s.fail + s.skip;
+    const done = total > 0 && s.fail === 0 && s.skip === 0;
+    const mark = done ? green('✓') : s === now ? yellow('▶') : dim('○');
+    console.log(`  ${mark} ${s.section} ${dim(done ? `${total}` : `${s.pass}/${total}`)}${s === now ? yellow('  ← you are here') : ''}`);
+  }
 }
 
 const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** Runs a step's specs with bun's own output; stops at the first spec file with a failure when `bail`. */
-function runStep(step: Step, bail: boolean) {
-  for (const spec of step.specs) {
-    const args = ['bun', 'test', `./${spec.file}`, '--only-failures'];
-    if (spec.sections) args.push('-t', `^(?:${spec.sections.map(escapeRegex).join('|')}) `);
-    if (bail) args.push('--bail');
-    const run = Bun.spawnSync(args, { cwd: ROOT, stdout: 'inherit', stderr: 'inherit' });
-    if (run.exitCode !== 0 && bail) return;
-  }
+/** Runs one spec file, optionally limited to some sections, printing bun's output; returns that output. */
+function runSpec(file: string, sections: string[] | undefined, bail: boolean): string {
+  const args = ['bun', 'test', `./${file}`, '--only-failures'];
+  if (sections) args.push('-t', `^(?:${sections.map(escapeRegex).join('|')}) `);
+  if (bail) args.push('--bail');
+  const run = Bun.spawnSync(args, { cwd: ROOT, stdout: 'pipe', stderr: 'pipe', env: { ...process.env, FORCE_COLOR: tty ? '1' : '0' } });
+  const output = run.stdout.toString() + run.stderr.toString();
+  process.stdout.write(output);
+  return output;
+}
+
+async function explain(output: string) {
+  const notes = await diagnose(output);
+  if (!notes.length) return;
+  console.log(cyan(bold('\nWhat this usually means:')));
+  for (const n of notes) console.log(cyan(`  • ${n}`));
 }
 
 // ---------------------------------------------------------------- commands
@@ -181,12 +307,21 @@ async function where() {
     if (state.furthest >= 0) console.log(green(`Step ${state.furthest} is done. On to the next one.\n`));
     await writeState({ ...state, furthest: current });
   }
+
+  const now = currentSection(result);
+  const b = await brief(step);
   header(current, result);
-  const { goal } = await brief(step);
-  if (goal) console.log(`\n${goal}\n`);
+  if (b.goal) console.log(`\n${b.goal}`);
+  sectionList(result, now);
+
+  const rungs = now ? b.sections.get(now.section) : undefined;
+  if (now) console.log(bold(`\nNow: ${now.section}`));
+  if (rungs?.[0]) console.log(`${rungs[0].body}\n`);
+
   console.log(dim('First failing test:'));
-  runStep(step, true);
-  console.log(dim(`\nMake it pass, then run \`bun run learn\` again. Stuck? \`bun run learn hint\`.`));
+  const output = now ? runSpec(now.file, [now.section], true) : '';
+  await explain(output);
+  console.log(dim(`\nMake it pass, then run \`bun run learn\` again. Stuck? \`bun run learn hint\` gives the next hint for this section.`));
   process.exitCode = 1;
 }
 
@@ -206,25 +341,42 @@ async function status() {
 
 async function hint() {
   const state = await readState();
-  const { current } = await evaluateAll();
+  const { evaluated, current } = await evaluateAll();
   if (current === -1) return console.log('Nothing left to hint at: every step is done.');
   const step = STEPS[current]!;
-  const { hints } = await brief(step);
-  if (!hints.length) return console.log(`No hints written for ${step.id} yet.`);
-  const shown = Math.min((state.hints[step.id] ?? 0) + 1, hints.length);
-  for (let i = 0; i < shown; i++) console.log(`${bold(`Hint ${i + 1} of ${hints.length}`)}\n${hints[i]}\n`);
-  if (shown === hints.length) console.log(dim('That was the last hint.'));
-  await writeState({ ...state, hints: { ...state.hints, [step.id]: shown } });
+  const b = await brief(step);
+  const now = currentSection(evaluated[current]!);
+  const rungs = now ? b.sections.get(now.section) : undefined;
+
+  const ladder = rungs?.map((r) => `${bold(r.title)}\n${r.body}`) ?? b.general;
+  if (!ladder.length) return console.log(`No hints written for ${step.id} yet. Re-read the brief: ${briefPath(step)}`);
+  const stateKey = rungs && now ? `${step.id}::${now.section}` : step.id;
+  const shown = Math.min((state.hints[stateKey] ?? 0) + 1, ladder.length);
+
+  if (rungs && now) console.log(dim(`Hints for: ${now.section}\n`));
+  for (let i = 0; i < shown; i++) console.log(`${dim(`Hint ${i + 1} of ${ladder.length}`)}\n${ladder[i]}\n`);
+  if (shown === ladder.length) {
+    console.log(dim('That was the last hint for this section.'));
+    if (b.mistakes) console.log(`\n${bold('Common mistakes')}\n${b.mistakes}`);
+  } else {
+    console.log(dim('Run `bun run learn hint` again for a more specific one.'));
+  }
+  await writeState({ ...state, hints: { ...state.hints, [stateKey]: shown } });
 }
 
 async function step(ref: string | undefined) {
   const index = ref === undefined ? -1 : findStep(ref);
   if (index === -1) { console.log(red(`No step "${ref}". See \`bun run learn list\`.`)); process.exitCode = 1; return; }
   const { evaluated } = await evaluateAll();
-  header(index, evaluated[index]);
-  const { goal } = await brief(STEPS[index]!);
-  if (goal) console.log(`\n${goal}\n`);
-  runStep(STEPS[index]!, false);
+  const result = evaluated[index]!;
+  header(index, result);
+  const b = await brief(STEPS[index]!);
+  if (b.goal) console.log(`\n${b.goal}`);
+  sectionList(result, currentSection(result));
+  console.log();
+  let output = '';
+  for (const spec of STEPS[index]!.specs) output += runSpec(spec.file, spec.sections, false);
+  await explain(output);
 }
 
 function list() {
@@ -243,15 +395,21 @@ async function check() {
   });
   for (const s of STEPS) {
     if (!(await Bun.file(ROOT + briefPath(s)).exists())) problems.push(`${s.id}: missing brief ${briefPath(s)}`);
+    const stepSections = new Set<string>();
     for (const spec of s.specs) {
       if (!(await Bun.file(ROOT + spec.file).exists())) { problems.push(`${s.id}: missing spec ${spec.file}`); continue; }
       const present = await sectionsOf(spec.file);
       for (const section of await sectionsFor(spec)) {
+        stepSections.add(section);
         if (!present.includes(section)) problems.push(`${s.id}: no section "${section}" in ${spec.file}`);
         const k = key(spec.file, section);
         if (owner.has(k)) problems.push(`"${section}" (${spec.file}) is in both ${owner.get(k)} and ${s.id}`);
         owner.set(k, s.id);
       }
+    }
+    // Section hints must name sections of this step, so the runner can find them.
+    for (const title of (await brief(s)).sections.keys()) {
+      if (!stepSections.has(title)) problems.push(`${s.id}: brief has hints for "${title}", which is not a section of this step`);
     }
   }
   for (const file of specFiles()) {
@@ -260,7 +418,7 @@ async function check() {
     }
   }
   if (problems.length) {
-    console.log(red(`${problems.length} problem(s) in learn/steps.ts:`));
+    console.log(red(`${problems.length} problem(s) in learn/steps.ts or the briefs:`));
     for (const p of problems) console.log(`  - ${p}`);
     process.exitCode = 1;
   } else {
