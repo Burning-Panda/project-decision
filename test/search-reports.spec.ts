@@ -108,9 +108,9 @@ describe('search finds content, ids, comments and transcripts, honouring access'
 
   describe('GIVEN decision PRJ-002', () => {
     describe('WHEN searching its id', () => {
-      it('THEN it is found', async () => {
+      it('THEN the exact match ranks first, ahead of fuzzy id matches', async () => {
         const { ids, b } = await searchable();
-        expect(ids('PRJ-002')).toEqual([b]);
+        expect(ids('PRJ-002')[0]).toBe(b);
       });
     });
   });

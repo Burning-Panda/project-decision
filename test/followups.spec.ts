@@ -88,8 +88,8 @@ describe('todo list is per user with decision context, filters, sorting and pagi
     const { log } = await setup();
     const id = proposed(log);
     const mk = (over: Record<string, unknown>) => act(log, id, U.alice, 'assign_followup', { ...FU, ...over }).data.followup;
-    mk({ title: 'A', due_date: '2024-05-01', priority: 'low' });
-    mk({ title: 'B', due_date: '2024-04-10', priority: 'high' });
+    mk({ title: 'A', due_date: '2024-05-01', priority: 'high' });
+    mk({ title: 'B', due_date: '2024-04-10', priority: 'low' });
     const c = mk({ title: 'C', due_date: '2024-04-20', priority: 'medium' });
     mk({ title: 'Carol only', assigned_to: U.carol });
     log.updateTodo(c.id, U.bob, { status: 'in_progress' });
@@ -115,9 +115,9 @@ describe('todo list is per user with decision context, filters, sorting and pagi
       });
     });
     describe('WHEN sorted by priority', () => {
-      it('THEN B, C, A', async () => {
+      it('THEN high to low: A, C, B (the reverse of due order)', async () => {
         const log = await todos();
-        expect(log.listTodos({ user: U.bob, sort: 'priority' }).items.map((t: any) => t.title)).toEqual(['B', 'C', 'A']);
+        expect(log.listTodos({ user: U.bob, sort: 'priority' }).items.map((t: any) => t.title)).toEqual(['A', 'C', 'B']);
       });
     });
   });

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import { setup, proposed, act, vote, expectCode, U } from './support/index';
 
 describe('project settings are merged over documented defaults', () => {
@@ -301,6 +301,32 @@ describe('consensus: the approve action counts as an approve vote (202)', () => 
         expect(r.status_code).toBe(202);
         expect(r.metadata.vote_tally.approve).toBe(1);
         expect(r.decision.status).toBe('proposed');
+      });
+    });
+  });
+});
+
+describe('consensus: the request_revision action is a revision request, not a vote', () => {
+  describe('GIVEN consensus mode and a proposed decision bob approved', () => {
+    let log: any;
+    let id: string;
+    beforeEach(async () => {
+      ({ log } = await setup({ mode: 'consensus_voting' }));
+      id = proposed(log);
+      vote(log, id, U.bob, 'approve');
+    });
+
+    describe('WHEN the lead uses the request_revision action', () => {
+      let r: any;
+      beforeEach(() => { r = act(log, id, U.lead, 'request_revision', { reason: 'tighten scope' }); });
+
+      it('THEN 201 and the decision is back in draft', () => {
+        expect(r.status_code).toBe(201);
+        expect(r.decision.status).toBe('draft');
+      });
+
+      it('THEN it is not counted as a request_revision vote', () => {
+        expect(r.decision.vote_tally.request_revision).toBe(0);
       });
     });
   });
