@@ -1,12 +1,21 @@
-import { describe, it, expect } from 'bun:test';
-import { setup, expectCode, SUBSCRIPTION, U } from './support/index';
+import { describe, it, expect, beforeEach } from 'bun:test';
+import { freshLog, expectCode, SUBSCRIPTION, U } from './support/index';
+
+// Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
+// Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.
+
+const PHONE = '+14155550123';
+const SMS_AND_MUTE = { phone: PHONE, preferences: { channels: { sms: true }, muted_types: ['vote_received'] } };
 
 describe('profiles default sensibly: email derives from the user id, email is the only channel on', () => {
   describe('GIVEN bob without a stored profile', () => {
+    const h = freshLog();
+
     describe('WHEN he reads it', () => {
-      it('THEN email derives from his id and email is the only enabled channel', async () => {
-        const { log } = await setup();
-        const p = log.getProfile(U.bob, U.bob);
+      let p: any;
+      beforeEach(() => { p = h.log.getProfile(U.bob, U.bob); });
+
+      it('THEN email derives from his id and email is the only enabled channel', () => {
         expect(p.email).toBe(U.bob);
         expect(p.phone).toBe(null);
         expect(p.push_subscriptions).toEqual([]);
@@ -16,38 +25,57 @@ describe('profiles default sensibly: email derives from the user id, email is th
   });
 
   describe('GIVEN a member whose id is not an address', () => {
+    const h = freshLog();
+    beforeEach(() => { h.log.addTeamMember({ owner: 'acme', user: 'acme-bot', actor: 'acme' }); });
+
     describe('WHEN the org reads the profile', () => {
-      it('THEN email is null', async () => {
-        const { log } = await setup();
-        log.addTeamMember({ owner: 'acme', user: 'acme-bot', actor: 'acme' });
-        expect(log.getProfile('acme-bot', 'acme').email).toBe(null);
+      let p: any;
+      beforeEach(() => { p = h.log.getProfile('acme-bot', 'acme'); });
+
+      it('THEN email is null', () => {
+        expect(p.email).toBe(null);
       });
     });
   });
 });
 
 describe('profile updates merge, validate and respect permissions', () => {
-  describe('GIVEN bob', () => {
+  describe('GIVEN bob without a stored profile', () => {
+    const h = freshLog();
+
     describe('WHEN he sets a phone, enables sms and mutes vote_received', () => {
-      it('THEN the profile reflects it', async () => {
-        const { log } = await setup();
-        const p = log.setProfile(U.bob, U.bob, { phone: '+14155550123', preferences: { channels: { sms: true }, muted_types: ['vote_received'] } });
-        expect(p.phone).toBe('+14155550123');
+      let p: any;
+      beforeEach(() => { p = h.log.setProfile(U.bob, U.bob, SMS_AND_MUTE); });
+
+      it('THEN the profile reflects it', () => {
+        expect(p.phone).toBe(PHONE);
         expect(p.preferences.channels).toEqual({ email: true, sms: true, push: false });
       });
     });
   });
 
-  describe('GIVEN a stored phone', () => {
-    describe('WHEN bob later adds a push subscription and enables push', () => {
-      it('THEN earlier fields are kept and new ones merged', async () => {
-        const { log } = await setup();
-        log.setProfile(U.bob, U.bob, { phone: '+14155550123', preferences: { channels: { sms: true }, muted_types: ['vote_received'] } });
-        const again = log.setProfile(U.bob, U.bob, { push_subscriptions: [SUBSCRIPTION], preferences: { channels: { push: true } } });
-        expect(again.phone).toBe('+14155550123');
-        expect(again.push_subscriptions).toEqual([SUBSCRIPTION]);
-        expect(again.preferences.muted_types).toEqual(['vote_received']);
-        expect(again.preferences.channels).toEqual({ email: true, sms: true, push: true });
+  describe('GIVEN bob\'s stored phone, sms and muted vote_received', () => {
+    const h = freshLog();
+    beforeEach(() => { h.log.setProfile(U.bob, U.bob, SMS_AND_MUTE); });
+
+    describe('WHEN he later adds a push subscription and enables push', () => {
+      let p: any;
+      beforeEach(() => { p = h.log.setProfile(U.bob, U.bob, { push_subscriptions: [SUBSCRIPTION], preferences: { channels: { push: true } } }); });
+
+      it('THEN earlier fields are kept and new ones merged', () => {
+        expect(p.phone).toBe(PHONE);
+        expect(p.push_subscriptions).toEqual([SUBSCRIPTION]);
+        expect(p.preferences.muted_types).toEqual(['vote_received']);
+        expect(p.preferences.channels).toEqual({ email: true, sms: true, push: true });
+      });
+    });
+
+    describe('WHEN he sets phone to null', () => {
+      let p: any;
+      beforeEach(() => { p = h.log.setProfile(U.bob, U.bob, { phone: null }); });
+
+      it('THEN it is cleared', () => {
+        expect(p.phone).toBe(null);
       });
     });
   });
@@ -65,45 +93,48 @@ describe('profile updates merge, validate and respect permissions', () => {
     ['muted_types that is not a list', { preferences: { muted_types: 'all' } }],
   ];
   for (const [label, input] of invalid) {
-    describe(`GIVEN bob`, () => {
+    describe('GIVEN bob', () => {
+      const h = freshLog();
+
       describe(`WHEN he saves a profile with ${label}`, () => {
-        it(`THEN VALIDATION_ERROR 400`, async () => {
-          const { log } = await setup();
-          expectCode(() => log.setProfile(U.bob, U.bob, input), 'VALIDATION_ERROR', 400);
+        let save: () => unknown;
+        beforeEach(() => { save = () => h.log.setProfile(U.bob, U.bob, input); });
+
+        it('THEN VALIDATION_ERROR 400', () => {
+          expectCode(save, 'VALIDATION_ERROR', 400);
         });
       });
     });
   }
 
   describe('GIVEN bob\'s profile', () => {
-    describe('WHEN carol reads it', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        expectCode(() => log.getProfile(U.bob, U.carol), 'FORBIDDEN', 403);
-      });
-    });
-    describe('WHEN carol edits it', () => {
-      it('THEN FORBIDDEN 403', async () => {
-        const { log } = await setup();
-        expectCode(() => log.setProfile(U.bob, U.carol, { phone: '+14155550123' }), 'FORBIDDEN', 403);
-      });
-    });
-    describe('WHEN the org admin edits his email', () => {
-      it('THEN the change is applied', async () => {
-        const { log } = await setup();
-        expect(log.setProfile(U.bob, U.org, { email: 'bob@personal.example' }).email).toBe('bob@personal.example');
-      });
-    });
-  });
+    const h = freshLog();
 
-  describe('GIVEN a stored phone', () => {
-    describe('WHEN bob sets phone to null', () => {
-      it('THEN it is cleared', async () => {
-        const { log } = await setup();
-        log.setProfile(U.bob, U.bob, { phone: '+14155550123' });
-        expect(log.setProfile(U.bob, U.bob, { phone: null }).phone).toBe(null);
+    describe('WHEN carol reads it', () => {
+      let read: () => unknown;
+      beforeEach(() => { read = () => h.log.getProfile(U.bob, U.carol); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(read, 'FORBIDDEN', 403);
+      });
+    });
+
+    describe('WHEN carol edits it', () => {
+      let edit: () => unknown;
+      beforeEach(() => { edit = () => h.log.setProfile(U.bob, U.carol, { phone: PHONE }); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(edit, 'FORBIDDEN', 403);
+      });
+    });
+
+    describe('WHEN the org admin edits his email', () => {
+      let p: any;
+      beforeEach(() => { p = h.log.setProfile(U.bob, U.org, { email: 'bob@personal.example' }); });
+
+      it('THEN the change is applied', () => {
+        expect(p.email).toBe('bob@personal.example');
       });
     });
   });
 });
-
