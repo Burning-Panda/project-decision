@@ -26,6 +26,7 @@ bun run start:dev        # watch mode
 | `bun run start` / `start:dev` / `start:debug` | Run the app (`nest start`, optionally watch/debug) |
 | `bun run build` / `start:prod` | Compile to `dist/` and run it |
 | `bun test` | Specs in `test/` (bun:test) |
+| `bun run learn` | The learning path: the next step to implement and its first failing test. See [`learn/README.md`](learn/README.md) |
 | `bun run test:foundation` | Only `test/domain` (owners, teams, projects, module wiring). Every other spec builds on these, so fix them first |
 | `bun run test:cov` | Tests with coverage of `src/`; fails below 90% of lines or functions (`bunfig.toml`) |
 | `bun run lint` / `format` | oxlint (type-aware) / prettier |

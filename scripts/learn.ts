@@ -131,7 +131,7 @@ const briefPath = (step: Step) => `learn/steps/${step.id}.md`;
 async function brief(step: Step) {
   const text = await Bun.file(ROOT + briefPath(step)).text().catch(() => '');
   const section = (title: string) => text.split(new RegExp(`^## ${title}\\s*$`, 'm'))[1]?.split(/^## /m)[0]?.trim() ?? '';
-  const hints = section('Hints').split(/^### .*$/m).map((h) => h.trim()).filter(Boolean);
+  const hints = section('Hints').split(/^### .*$/m).slice(1).map((h) => h.trim()).filter(Boolean); // [0] is the intro line
   return { goal: section('Goal'), hints };
 }
 

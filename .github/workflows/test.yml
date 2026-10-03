@@ -22,6 +22,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - name: Learning path covers every spec section
+        run: bun run learn check
       - name: Foundation specs (owners, teams, projects, module wiring)
         run: bun test test/domain
       - name: All specs
