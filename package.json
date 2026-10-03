@@ -17,6 +17,7 @@
     "lint": "oxlint --type-aware src/ test/",
     "test": "bun test",
     "test:foundation": "bun test test/domain",
+    "learn": "bun run scripts/learn.ts",
     "test:watch": "bun test --watch",
     "test:cov": "bun test --coverage",
     "test:focus": "bun test --watch --bail test/"
