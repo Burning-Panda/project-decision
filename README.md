@@ -25,9 +25,8 @@ bun run start:dev        # watch mode
 |--------|---------|
 | `bun run start` / `start:dev` / `start:debug` | Run the app (`nest start`, optionally watch/debug) |
 | `bun run build` / `start:prod` | Compile to `dist/` and run it |
-| `bun test` | Specs in `test/` (bun:test). Run `bun test test/` to skip the old suite in `backup/` |
+| `bun test` | Specs in `test/` (bun:test) |
 | `bun run test:cov` | Tests with coverage |
-| `bun run test:parity` | Checks every test of the original suite has a counterpart in the new specs |
 | `bun run lint` / `format` | oxlint (type-aware) / prettier |
 
 Storage is chosen by environment variable (set at most one; none = in-memory):
@@ -54,7 +53,6 @@ Feature folders, each with a module, a controller and a `dto/` folder of validat
 | `src/common/` | `DecisionLogError` and the `X-User` guard |
 | `src/helpers/` | Small single-purpose helpers grouped by action (`auth/`, `errors/`, `files/`, `http/`, `routing/`) |
 | `test/` | `*.spec.ts` (bun:test, nested GIVEN/WHEN/THEN). `test/support/` holds fixtures; `test/support/target.ts` is the only place specs import from `src/` |
-| `scripts/check-parity.ts` | Original-vs-new test parity check |
 | `backup/` | The original Node implementation, the porting reference |
 
 ## Behaviour notes / decisions where the plan was ambiguous

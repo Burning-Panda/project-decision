@@ -210,7 +210,7 @@ describe('end to end: team members receive real emails over SMTP, and transient 
       });
 
       it('THEN bob\'s subject names the decision and the text links to it', () => {
-        const bob = ctx.server.sessions.find((s: any) => s.message && s.rcpts[0] === U.bob);
+        const bob = ctx.server.sessions.find((s: any) => s.message && s.rcpts[0] === U.bob)!;
         expect(bob.message).toContain(`Subject: [${ctx.id}] Decision proposed for review`);
         expect(bob.message).toContain(`https://dl.example.com/#/d/${ctx.id}`);
       });
