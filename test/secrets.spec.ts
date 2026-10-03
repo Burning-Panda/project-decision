@@ -3,7 +3,7 @@ import { describe, it, expect } from 'bun:test';
 import {
   SecretBox, MemoryStore, SqliteStore, WebhookDispatcher, verifySignature, buildLog,
   makeClock, randomBytes, tmpDbFile, U,
-} from './support/index.js';
+} from './support/index';
 
 const key = () => randomBytes(32);
 const boxOf = (...keys: Buffer[]) => new SecretBox({ keys });

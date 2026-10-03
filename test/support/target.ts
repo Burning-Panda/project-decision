@@ -13,25 +13,25 @@
  *   src/notifications/*                       index (manager, channel contract, payloads), mime, smtp, email
  */
 import { Test } from '@nestjs/testing';
-import { DecisionLog } from '../../src/decision-log/decision-log.js';
-import { DecisionLogModule } from '../../src/decision-log/decision-log.module.js';
-import { ApiModule } from '../../src/api/api.module.js';
-import { onCleanup } from './cleanup.js';
+import { DecisionLog } from '../../src/decision-log/decision-log';
+import { DecisionLogModule } from '../../src/decision-log/decision-log.module';
+import { ApiModule } from '../../src/api/api.module';
+import { onCleanup } from './cleanup';
 
-export { DecisionLog } from '../../src/decision-log/decision-log.js';
-export { MemoryStore, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS } from '../../src/storage/store.js';
-export { SqliteStore } from '../../src/storage/sqlite-store.js';
-export { PostgresStore } from '../../src/storage/postgres-store.js';
-export { MIGRATIONS } from '../../src/storage/migrations/postgres.js';
-export { SecretBox } from '../../src/storage/secrets.js';
-export { WebhookDispatcher, verifySignature } from '../../src/webhooks/dispatcher.js';
+export { DecisionLog } from '../../src/decision-log/decision-log';
+export { MemoryStore, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS } from '../../src/storage/store';
+export { SqliteStore } from '../../src/storage/sqlite-store';
+export { PostgresStore } from '../../src/storage/postgres-store';
+export { MIGRATIONS } from '../../src/storage/migrations/postgres';
+export { SecretBox } from '../../src/storage/secrets';
+export { WebhookDispatcher, verifySignature } from '../../src/webhooks/dispatcher';
 export {
   NotificationChannel, NotificationManager, createNotificationPayload, validateNotificationPayload,
   sent, failed, skipped, isDeliveryResult, checkChannelConformance,
-} from '../../src/notifications/index.js';
-export { buildMimeMessage, formatAddress, parseAddress, dotStuff, encodeWord } from '../../src/notifications/mime.js';
-export { SmtpTransport, SmtpError, parseSmtpUrl } from '../../src/notifications/smtp.js';
-export { EmailChannel, MemoryMailTransport } from '../../src/notifications/email.js';
+} from '../../src/notifications/index';
+export { buildMimeMessage, formatAddress, parseAddress, dotStuff, encodeWord } from '../../src/notifications/mime';
+export { SmtpTransport, SmtpError, parseSmtpUrl } from '../../src/notifications/smtp';
+export { EmailChannel, MemoryMailTransport } from '../../src/notifications/email';
 
 /** Boots a DecisionLog through a Nest testing module. Rejects if construction rejects (e.g. missing secret box). */
 export async function buildLog(options: Record<string, any> = {}): Promise<any> {

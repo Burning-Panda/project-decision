@@ -1,4 +1,4 @@
 import { afterEach } from 'bun:test';
-import { runCleanups } from './cleanup.js';
+import { runCleanups } from './cleanup';
 
 afterEach(runCleanups);

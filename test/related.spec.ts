@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, draft, act, expectCode, U } from './support/index.js';
+import { setup, draft, act, expectCode, U } from './support/index';
 
 const PG = 'Migrate production database from MySQL to PostgreSQL 16. Performance benchmarks, replication and rollback plan for the database migration.';
 const PG2 = 'Migrate the production database from MySQL to PostgreSQL 16. Benchmarks for performance, replication and a rollback plan for database migration.';

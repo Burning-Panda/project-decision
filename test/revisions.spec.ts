@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, draft, proposed, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from './support/index.js';
+import { setup, draft, proposed, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from './support/index';
 
 describe('request_revision needs a reason and a proposed decision; returns 201 with a draft', () => {
   describe('GIVEN a draft', () => {

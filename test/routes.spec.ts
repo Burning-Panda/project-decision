@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { buildLog, startApi, makeCaller } from './support/index.js';
-import { ROUTES, PUBLIC_ASSETS } from './support/routes.js';
+import { buildLog, startApi, makeCaller } from './support/index';
+import { ROUTES, PUBLIC_ASSETS } from './support/routes';
 
 // Routing is resolved BEFORE authentication, so these checks need no users, data or domain logic:
 //   registered route + no X-User        -> 401 UNAUTHENTICATED

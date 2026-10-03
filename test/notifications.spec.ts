@@ -3,7 +3,7 @@ import {
   NotificationChannel, NotificationManager, createNotificationPayload, validateNotificationPayload,
   sent, failed, skipped, isDeliveryResult, checkChannelConformance,
   SqliteStore, buildLog, setup, proposed, act, expectCode, makeClock, testBox, tmpDbFile, U,
-} from './support/index.js';
+} from './support/index';
 
 // ---------------------------------------------------------------- test doubles
 class FakeChannel extends NotificationChannel {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, proposed, act, draft, startApi, makeCaller, U, CONTENT_V1, CONTENT_V2 } from './support/index.js';
+import { setup, proposed, act, draft, startApi, makeCaller, U, CONTENT_V1, CONTENT_V2 } from './support/index';
 
 /** A fresh log + HTTP server for one test. */
 async function boot(settings: Record<string, any> = { mode: 'consensus_voting' }, apiOptions: Record<string, any> = {}) {

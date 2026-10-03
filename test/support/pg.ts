@@ -1,7 +1,7 @@
 import { SQL } from 'bun';
 import { beforeEach, afterEach } from 'bun:test';
-import { PostgresStore } from './target.js';
-import { randomHex } from './crypto.js';
+import { PostgresStore } from './target';
+import { randomHex } from './crypto';
 
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 export const HAS_PG = Boolean(TEST_DATABASE_URL);

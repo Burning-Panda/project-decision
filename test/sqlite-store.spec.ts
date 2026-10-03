@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { buildLog, SqliteStore, makeClock, testBox, tmpDbFile, act, expectCode, U, CONTENT_V1 } from './support/index.js';
+import { buildLog, SqliteStore, makeClock, testBox, tmpDbFile, act, expectCode, U, CONTENT_V1 } from './support/index';
 
 let sharedBox: ReturnType<typeof testBox> | undefined;
 const box = () => (sharedBox ??= testBox());

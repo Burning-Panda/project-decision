@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import {
   PostgresStore, MemoryStore, MIGRATIONS, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS,
   buildLog, startApi, makeClock, testBox, usePostgres, statementLog, HAS_PG, expectCode, act, U, CONTENT_V1,
-} from './support/index.js';
+} from './support/index';
 
 let sharedBox: ReturnType<typeof testBox> | undefined;
 const box = () => (sharedBox ??= testBox());

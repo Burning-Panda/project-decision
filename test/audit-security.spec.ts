@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, draft, proposed, act, expectCode, sha256, U, buildLog, MemoryStore } from './support/index.js';
+import { setup, draft, proposed, act, expectCode, sha256, U, buildLog, MemoryStore } from './support/index';
 
 describe('outsiders cannot read anything; the org identifier can read everything', () => {
   const reads: Array<[string, (log: any, id: string) => unknown]> = [

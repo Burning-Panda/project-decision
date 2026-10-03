@@ -5,8 +5,8 @@ import {
   EmailChannel, MemoryMailTransport,
   NotificationManager, checkChannelConformance, createNotificationPayload,
   dialLocal, setup, proposed, U,
-} from './support/index.js';
-import { startMockSmtp, makeCert } from './support/mock-smtp.js';
+} from './support/index';
+import { startMockSmtp, makeCert } from './support/mock-smtp';
 
 // ---------------------------------------------------------------- helpers
 function parseMime(raw: string) {

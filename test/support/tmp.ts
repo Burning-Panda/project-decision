@@ -1,4 +1,4 @@
-import { onCleanup } from './cleanup.js';
+import { onCleanup } from './cleanup';
 
 /** A private temp directory removed after the test. */
 export function tmpDir(prefix = 'dl-') {

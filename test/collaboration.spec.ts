@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, proposed, act, expectCode, U, MEETING } from './support/index.js';
+import { setup, proposed, act, expectCode, U, MEETING } from './support/index';
 
 describe('anyone on the team can comment in any status; outsiders cannot', () => {
   async function approvedDecision() {

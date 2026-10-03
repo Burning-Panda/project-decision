@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, draft, act, expectCode, U } from './support/index.js';
+import { setup, draft, act, expectCode, U } from './support/index';
 
 async function seed() {
   const ctx = await setup({ mode: 'consensus_voting' });

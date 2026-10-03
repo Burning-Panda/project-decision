@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, proposed, act, expectCode, U, FOLLOWUP as FU } from './support/index.js';
+import { setup, proposed, act, expectCode, U, FOLLOWUP as FU } from './support/index';
 
 describe('assign_followup creates a pending follow-up/todo and notifies the assignee', () => {
   async function assigned() {

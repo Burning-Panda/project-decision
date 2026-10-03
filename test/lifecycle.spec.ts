@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, draft, proposed, act, expectCode, U, CONTENT_V1 } from './support/index.js';
+import { setup, draft, proposed, act, expectCode, U, CONTENT_V1 } from './support/index';
 
 describe('decision ids increment per project and project count tracks them', () => {
   async function twoProjects() {

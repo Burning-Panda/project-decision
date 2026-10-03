@@ -1,4 +1,4 @@
-import { onCleanup } from './cleanup.js';
+import { onCleanup } from './cleanup';
 
 /** Self-signed cert for TLS tests; returns null when openssl is unavailable. */
 export async function makeCert(): Promise<{ key: string; cert: string } | null> {

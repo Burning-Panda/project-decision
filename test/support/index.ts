@@ -1,9 +1,9 @@
-export * from './clock.js';
-export * from './fixtures.js';
-export * from './setup.js';
-export * from './http.js';
-export * from './tmp.js';
-export * from './target.js';
-export { onCleanup } from './cleanup.js';
-export * from './crypto.js';
-export * from './pg.js';
+export * from './clock';
+export * from './fixtures';
+export * from './setup';
+export * from './http';
+export * from './tmp';
+export * from './target';
+export { onCleanup } from './cleanup';
+export * from './crypto';
+export * from './pg';

@@ -1,8 +1,8 @@
 import { expect } from 'bun:test';
-import { makeClock } from './clock.js';
-import { randomBytes } from './crypto.js';
-import { U, CONTENT_V1 } from './fixtures.js';
-import { buildLog, SecretBox } from './target.js';
+import { makeClock } from './clock';
+import { randomBytes } from './crypto';
+import { U, CONTENT_V1 } from './fixtures';
+import { buildLog, SecretBox } from './target';
 
 /** A fresh random-key SecretBox for tests that use persistent stores. */
 export const testBox = () => new SecretBox({ keys: [randomBytes(32)] });

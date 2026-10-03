@@ -2,7 +2,7 @@ import { describe, it, expect } from 'bun:test';
 import {
   WebhookDispatcher, verifySignature, SqliteStore, buildLog, setup, draft, proposed, act, expectCode,
   makeClock, testBox, tmpDbFile, onCleanup, U, URL_OK, PUBLIC_DNS,
-} from './support/index.js';
+} from './support/index';
 
 function recorder(statuses: Array<number | Error> = [200]) {
   const calls: Array<{ url: string; init: any; body: any }> = [];

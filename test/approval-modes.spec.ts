@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'bun:test';
-import { setup, proposed, act, vote, expectCode, U } from './support/index.js';
+import { setup, proposed, act, vote, expectCode, U } from './support/index';
 
 describe('project settings are merged over documented defaults', () => {
   describe('GIVEN a project created with mode consensus_voting', () => {
