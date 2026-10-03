@@ -1,55 +1,77 @@
 import { SQL } from 'bun';
-import { describe, it, expect } from 'bun:test';
+import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   SecretBox, MemoryStore, SqliteStore, WebhookDispatcher, verifySignature, buildLog,
-  makeClock, randomBytes, tmpDbFile, U,
+  makeClock, onCleanup, randomBytes, tmpDbFile, U,
 } from './support/index';
+
+// Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
+// Actions expected to fail are captured as a thunk (or promise) in WHEN and checked in THEN.
 
 const key = () => randomBytes(32);
 const boxOf = (...keys: Buffer[]) => new SecretBox({ keys });
 const HOOK_URL = 'https://hooks.example.com/x';
 
-async function hookedLog(box: any, store: any = new MemoryStore()) {
-  const clock = makeClock();
-  const log = await buildLog({ store, clock: clock.now, secretBox: box });
+/** Builds a log over `store` with this secret box, plus org acme, alice and project PRJ. */
+async function acmeLog(box: any, store: any = new MemoryStore()) {
+  const log = await buildLog({ store, clock: makeClock().now, secretBox: box });
   log.createOwner({ identifier: 'acme' });
   log.addTeamMember({ owner: 'acme', user: U.alice, actor: 'acme' });
   log.createProject({ owner: 'acme', identifier: 'PRJ', title: 'P', actor: 'acme' });
-  return { log, clock };
+  return log;
 }
 
 describe('encrypt/decrypt round trip; ciphertext is randomised and carries the key id', () => {
   describe('GIVEN a box', () => {
+    let box: SecretBox;
+    beforeEach(() => { box = boxOf(key()); });
+
     describe('WHEN the same plaintext is encrypted twice', () => {
+      let first: string, second: string;
+      beforeEach(() => {
+        first = box.encrypt('whsec_abc', 'webhook-001');
+        second = box.encrypt('whsec_abc', 'webhook-001');
+      });
+
       it('THEN the ciphertexts differ (fresh IV)', () => {
-        const box = boxOf(key());
-        expect(box.encrypt('whsec_abc', 'webhook-001')).not.toBe(box.encrypt('whsec_abc', 'webhook-001'));
+        expect(first).not.toBe(second);
       });
     });
-    describe('WHEN encrypting', () => {
+
+    describe('WHEN a plaintext is encrypted', () => {
+      let token: string;
+      beforeEach(() => { token = box.encrypt('whsec_abc', 'webhook-001'); });
+
       it('THEN the token is enc:v1 with an 8-hex key id and hides the plaintext', () => {
-        const a = boxOf(key()).encrypt('whsec_abc', 'webhook-001');
-        expect(a).toMatch(/^enc:v1:[0-9a-f]{8}:/);
-        expect(a.includes('whsec_abc')).toBe(false);
+        expect(token).toMatch(/^enc:v1:[0-9a-f]{8}:/);
+        expect(token).not.toContain('whsec_abc');
       });
     });
   });
 
-  describe('GIVEN a token', () => {
+  describe('GIVEN a token for webhook-001', () => {
+    let box: SecretBox;
+    let token: string;
+    beforeEach(() => {
+      box = boxOf(key());
+      token = box.encrypt('whsec_abc', 'webhook-001');
+    });
+
     describe('WHEN decrypted with the same record id', () => {
+      let plain: string;
+      beforeEach(() => { plain = box.decrypt(token, 'webhook-001'); });
+
       it('THEN the plaintext returns', () => {
-        const box = boxOf(key());
-        expect(box.decrypt(box.encrypt('whsec_abc', 'webhook-001'), 'webhook-001')).toBe('whsec_abc');
+        expect(plain).toBe('whsec_abc');
       });
     });
-  });
 
-  describe('GIVEN a token and a plaintext', () => {
-    describe('WHEN isEncrypted is asked', () => {
+    describe('WHEN isEncrypted is asked of the token and of a plaintext', () => {
+      let answers: [boolean, boolean];
+      beforeEach(() => { answers = [SecretBox.isEncrypted(token), SecretBox.isEncrypted('whsec_abc')]; });
+
       it('THEN only the token is encrypted', () => {
-        const token = boxOf(key()).encrypt('whsec_abc', 'webhook-001');
-        expect(SecretBox.isEncrypted(token)).toBe(true);
-        expect(SecretBox.isEncrypted('whsec_abc')).toBe(false);
+        expect(answers).toEqual([true, false]);
       });
     });
   });
@@ -57,39 +79,52 @@ describe('encrypt/decrypt round trip; ciphertext is randomised and carries the k
 
 describe('ciphertext is bound to its record, key and integrity', () => {
   describe('GIVEN a token for webhook-001', () => {
+    let box: SecretBox;
+    let token: string;
+    beforeEach(() => {
+      box = boxOf(key());
+      token = box.encrypt('s3cret', 'webhook-001');
+    });
+
     describe('WHEN decrypted as webhook-002', () => {
+      let decrypt: () => unknown;
+      beforeEach(() => { decrypt = () => box.decrypt(token, 'webhook-002'); });
+
       it('THEN it fails (swapping between records)', () => {
-        const box = boxOf(key());
-        const token = box.encrypt('s3cret', 'webhook-001');
-        expect(() => box.decrypt(token, 'webhook-002')).toThrow(/decrypt/i);
+        expect(decrypt).toThrow(/decrypt/i);
       });
     });
-  });
 
-  describe('GIVEN a token with a tampered body', () => {
-    describe('WHEN decrypted', () => {
-      it('THEN it fails', () => {
-        const box = boxOf(key());
-        const parts = box.encrypt('s3cret', 'webhook-001').split(':');
+    describe('WHEN its body is tampered with and it is decrypted', () => {
+      let decrypt: () => unknown;
+      beforeEach(() => {
+        const parts = token.split(':');
         parts[5] = Buffer.from('tampered!').toString('base64');
-        expect(() => box.decrypt(parts.join(':'), 'webhook-001')).toThrow(/decrypt/i);
+        decrypt = () => box.decrypt(parts.join(':'), 'webhook-001');
+      });
+
+      it('THEN it fails', () => {
+        expect(decrypt).toThrow(/decrypt/i);
       });
     });
-  });
 
-  describe('GIVEN a token from another key', () => {
-    describe('WHEN decrypted', () => {
+    describe('WHEN a box with another key decrypts it', () => {
+      let decrypt: () => unknown;
+      beforeEach(() => { decrypt = () => boxOf(key()).decrypt(token, 'webhook-001'); });
+
       it('THEN it reports an unknown key id', () => {
-        const token = boxOf(key()).encrypt('s3cret', 'webhook-001');
-        expect(() => boxOf(key()).decrypt(token, 'webhook-001')).toThrow(/key/i);
+        expect(decrypt).toThrow(/key/i);
       });
     });
   });
 
   describe('GIVEN a plaintext string', () => {
     describe('WHEN decrypted', () => {
+      let decrypt: () => unknown;
+      beforeEach(() => { decrypt = () => boxOf(key()).decrypt('not-encrypted', 'x'); });
+
       it('THEN it is rejected as not encrypted', () => {
-        expect(() => boxOf(key()).decrypt('not-encrypted', 'x')).toThrow(/encrypted/i);
+        expect(decrypt).toThrow(/encrypted/i);
       });
     });
   });
@@ -98,92 +133,103 @@ describe('ciphertext is bound to its record, key and integrity', () => {
 describe('keys must be 32 bytes; fromEnv understands base64 and hex and previous keys', () => {
   describe('GIVEN a 16-byte key', () => {
     describe('WHEN a box is built', () => {
+      let build: () => unknown;
+      beforeEach(() => { build = () => new SecretBox({ keys: [randomBytes(16)] }); });
+
       it('THEN it requires 32 bytes', () => {
-        expect(() => new SecretBox({ keys: [randomBytes(16)] })).toThrow(/32 bytes/);
+        expect(build).toThrow(/32 bytes/);
       });
     });
   });
 
   describe('GIVEN no keys', () => {
     describe('WHEN a box is built', () => {
+      let build: () => unknown;
+      beforeEach(() => { build = () => new SecretBox({ keys: [] }); });
+
       it('THEN it requires at least one key', () => {
-        expect(() => new SecretBox({ keys: [] })).toThrow(/at least one key/);
+        expect(build).toThrow(/at least one key/);
       });
     });
   });
 
-  describe('GIVEN a base64 current key and a hex previous key', () => {
+  describe('GIVEN a box from a base64 SECRETS_KEY and a hex SECRETS_KEY_PREVIOUS', () => {
+    let previous: Buffer;
+    let box: SecretBox;
+    beforeEach(() => {
+      const current = key();
+      previous = key();
+      box = SecretBox.fromEnv({ SECRETS_KEY: current.toString('base64'), SECRETS_KEY_PREVIOUS: previous.toString('hex') })!;
+    });
+
     describe('WHEN a token from the previous key is decrypted', () => {
+      let plain: string;
+      beforeEach(() => { plain = box.decrypt(boxOf(previous).encrypt('x', 'a'), 'a'); });
+
       it('THEN it works', () => {
-        const k1 = key(), k2 = key();
-        const box = SecretBox.fromEnv({ SECRETS_KEY: k1.toString('base64'), SECRETS_KEY_PREVIOUS: k2.toString('hex') });
-        const old = boxOf(k2).encrypt('x', 'a');
-        expect(box!.decrypt(old, 'a')).toBe('x');
+        expect(plain).toBe('x');
       });
     });
-  });
 
-  describe('GIVEN a box with a previous key', () => {
-    describe('WHEN needsRotation is asked', () => {
+    describe('WHEN needsRotation is asked of an old and a new token', () => {
+      let answers: [boolean, boolean];
+      beforeEach(() => { answers = [box.needsRotation(boxOf(previous).encrypt('x', 'a')), box.needsRotation(box.encrypt('x', 'a'))]; });
+
       it('THEN old tokens need it and new ones do not', () => {
-        const k1 = key(), k2 = key();
-        const box = SecretBox.fromEnv({ SECRETS_KEY: k1.toString('base64'), SECRETS_KEY_PREVIOUS: k2.toString('hex') })!;
-        expect(box.needsRotation(boxOf(k2).encrypt('x', 'a'))).toBe(true);
-        expect(box.needsRotation(box.encrypt('x', 'a'))).toBe(false);
+        expect(answers).toEqual([true, false]);
       });
     });
   });
 
   describe('GIVEN an empty environment', () => {
     describe('WHEN fromEnv runs', () => {
+      let box: unknown;
+      beforeEach(() => { box = SecretBox.fromEnv({}); });
+
       it('THEN no box is configured', () => {
-        expect(SecretBox.fromEnv({})).toBe(null);
+        expect(box).toBe(null);
       });
     });
   });
 
   describe('GIVEN a too-short SECRETS_KEY', () => {
     describe('WHEN fromEnv runs', () => {
+      let build: () => unknown;
+      beforeEach(() => { build = () => SecretBox.fromEnv({ SECRETS_KEY: 'short' }); });
+
       it('THEN it requires 32 bytes', () => {
-        expect(() => SecretBox.fromEnv({ SECRETS_KEY: 'short' })).toThrow(/32 bytes/);
+        expect(build).toThrow(/32 bytes/);
       });
     });
   });
 });
 
 describe('webhook secrets are encrypted in the store and absent from every serialised form', () => {
-  async function created() {
-    const { log } = await hookedLog(boxOf(key()));
-    const hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' });
-    return { log, hook };
-  }
+  describe('GIVEN an org with a secret box', () => {
+    let log: any;
+    beforeEach(async () => { log = await acmeLog(boxOf(key())); });
 
-  describe('GIVEN a new webhook', () => {
-    describe('WHEN it is created', () => {
-      it('THEN the plaintext whsec_ secret is returned once', async () => {
-        const { hook } = await created();
+    describe('WHEN a webhook is created', () => {
+      let hook: any;
+      beforeEach(() => { hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' }); });
+
+      it('THEN the plaintext whsec_ secret is returned once', () => {
         expect(hook.secret).toMatch(/^whsec_/);
       });
-    });
-    describe('WHEN the stored record is read', () => {
-      it('THEN it holds only an enc:v1 secret_enc', async () => {
-        const { log } = await created();
+
+      it('THEN the stored record holds only an enc:v1 secret_enc', () => {
         const stored = log.store.webhooks[0];
-        expect('secret' in stored).toBe(false);
+        expect(stored).not.toHaveProperty('secret');
         expect(stored.secret_enc).toMatch(/^enc:v1:/);
       });
-    });
-    describe('WHEN the store and audit trail are serialised', () => {
-      it('THEN the plaintext appears nowhere', async () => {
-        const { log, hook } = await created();
+
+      it('THEN the plaintext appears nowhere in the serialised store or audit trail', () => {
         const dump = JSON.stringify(log.store.toJSON()) + JSON.stringify(log.auditTrail());
-        expect(dump.includes(hook.secret)).toBe(false);
+        expect(dump).not.toContain(hook.secret);
       });
-    });
-    describe('WHEN webhooks are listed', () => {
-      it('THEN neither secret nor ciphertext is exposed', async () => {
-        const { log } = await created();
-        expect('secret_enc' in log.listWebhooks('acme', 'acme')[0]).toBe(false);
+
+      it('THEN listings expose neither secret nor ciphertext', () => {
+        expect(log.listWebhooks('acme', 'acme')[0]).not.toHaveProperty('secret_enc');
       });
     });
   });
@@ -191,19 +237,24 @@ describe('webhook secrets are encrypted in the store and absent from every seria
 
 describe('the dispatcher still signs with the decrypted secret', () => {
   describe('GIVEN an encrypted webhook and a created decision', () => {
+    let log: any;
+    let hook: any;
+    beforeEach(async () => {
+      log = await acmeLog(boxOf(key()));
+      hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, events: ['decision.created'], actor: 'acme' });
+      log.createDecision({ project: 'PRJ', actor: U.alice, title: 'x' });
+    });
+
     describe('WHEN the dispatcher runs', () => {
-      it('THEN the signature verifies with the plaintext secret', async () => {
-        // Given
-        const { log } = await hookedLog(boxOf(key()));
-        const hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, events: ['decision.created'], actor: 'acme' });
-        log.createDecision({ project: 'PRJ', actor: U.alice, title: 'x' });
-        let seen: any;
-        // When
+      let seen: any;
+      beforeEach(async () => {
         await new WebhookDispatcher(log, {
           resolve: async () => ['93.184.216.34'],
           transport: async (_u: string, init: any) => { seen = init; return { status: 200 }; },
         }).run();
-        // Then
+      });
+
+      it('THEN the signature verifies with the plaintext secret', () => {
         expect(verifySignature({
           secret: hook.secret, timestamp: seen.headers['x-decision-log-timestamp'], body: seen.body,
           signature: seen.headers['x-decision-log-signature'], now: log.clock(),
@@ -214,25 +265,25 @@ describe('the dispatcher still signs with the decrypted secret', () => {
 });
 
 describe('legacy plaintext secrets are encrypted automatically when the log starts', () => {
-  async function legacy() {
-    const store = new MemoryStore();
-    store.webhooks.push({
-      id: 'webhook-001', owner: 'acme', url: 'https://x.example.com', events: ['*'], secret: 'whsec_legacy',
-      active: true, created_by: 'acme', created_at: '2024-01-01T00:00:00.000Z', deleted_at: null,
-    });
-    const log = await buildLog({ store, secretBox: boxOf(key()) });
-    return { store, log };
-  }
-
   describe('GIVEN a store with a plaintext webhook secret', () => {
+    let store: MemoryStore;
+    beforeEach(() => {
+      store = new MemoryStore();
+      store.webhooks.push({
+        id: 'webhook-001', owner: 'acme', url: 'https://x.example.com', events: ['*'], secret: 'whsec_legacy',
+        active: true, created_by: 'acme', created_at: '2024-01-01T00:00:00.000Z', deleted_at: null,
+      });
+    });
+
     describe('WHEN the log starts', () => {
-      it('THEN the plaintext field is removed', async () => {
-        const { store } = await legacy();
-        expect('secret' in store.webhooks[0]).toBe(false);
+      let log: any;
+      beforeEach(async () => { log = await buildLog({ store, secretBox: boxOf(key()) }); });
+
+      it('THEN the plaintext field is removed', () => {
+        expect(store.webhooks[0]).not.toHaveProperty('secret');
       });
 
-      it('THEN the original secret is still recoverable', async () => {
-        const { store, log } = await legacy();
+      it('THEN the original secret is still recoverable', () => {
         expect(log.webhookSecret(store.webhooks[0])).toBe('whsec_legacy');
       });
     });
@@ -240,50 +291,63 @@ describe('legacy plaintext secrets are encrypted automatically when the log star
 });
 
 describe('rotation re-encrypts everything under the current key', () => {
-  async function rotatable() {
-    const oldKey = key(), newKey = key();
-    const store = new MemoryStore();
-    const { log } = await hookedLog(boxOf(oldKey), store);
-    const hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' });
-    const rotated = await buildLog({ store, secretBox: new SecretBox({ keys: [newKey, oldKey] }) });
-    return { oldKey, newKey, store, hook, rotated };
+  type Rotatable = { newKey: Buffer; store: MemoryStore; hook: any; rotated: any };
+
+  /** A webhook secret written under an old key, and a log (`rotated`) whose box holds [newKey, oldKey]. */
+  function rotatable(): Rotatable {
+    const h = {} as Rotatable;
+    beforeEach(async () => {
+      const oldKey = key();
+      h.newKey = key();
+      h.store = new MemoryStore();
+      const log = await acmeLog(boxOf(oldKey), h.store);
+      h.hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' });
+      h.rotated = await buildLog({ store: h.store, secretBox: new SecretBox({ keys: [h.newKey, oldKey] }) });
+    });
+    return h;
   }
 
-  describe('GIVEN a secret written under the old key', () => {
-    describe('WHEN read through a box holding both keys', () => {
-      it('THEN it decrypts', async () => {
-        const { store, hook, rotated } = await rotatable();
-        expect(rotated.webhookSecret(store.webhooks[0])).toBe(hook.secret);
+  describe('GIVEN a secret written under the old key and a box holding both keys', () => {
+    const h = rotatable();
+
+    describe('WHEN the secret is read', () => {
+      let secret: string;
+      beforeEach(() => { secret = h.rotated.webhookSecret(h.store.webhooks[0]); });
+
+      it('THEN it decrypts', () => {
+        expect(secret).toBe(h.hook.secret);
       });
     });
-  });
 
-  describe('GIVEN one secret under the old key', () => {
     describe('WHEN rotateSecrets runs', () => {
-      it('THEN one is rotated', async () => {
-        const { rotated } = await rotatable();
-        expect(rotated.rotateSecrets()).toEqual({ rotated: 1 });
+      let result: any;
+      beforeEach(() => { result = h.rotated.rotateSecrets(); });
+
+      it('THEN one is rotated', () => {
+        expect(result).toEqual({ rotated: 1 });
       });
     });
   });
 
   describe('GIVEN rotation already ran', () => {
+    const h = rotatable();
+    beforeEach(() => { h.rotated.rotateSecrets(); });
+
     describe('WHEN rotateSecrets runs again', () => {
-      it('THEN nothing is rotated (idempotent)', async () => {
-        const { rotated } = await rotatable();
-        rotated.rotateSecrets();
-        expect(rotated.rotateSecrets()).toEqual({ rotated: 0 });
+      let result: any;
+      beforeEach(() => { result = h.rotated.rotateSecrets(); });
+
+      it('THEN nothing is rotated (idempotent)', () => {
+        expect(result).toEqual({ rotated: 0 });
       });
     });
-  });
 
-  describe('GIVEN rotation ran', () => {
-    describe('WHEN only the new key is configured', () => {
-      it('THEN the secret still decrypts', async () => {
-        const { newKey, store, hook, rotated } = await rotatable();
-        rotated.rotateSecrets();
-        const onlyNew = await buildLog({ store, secretBox: boxOf(newKey) });
-        expect(onlyNew.webhookSecret(store.webhooks[0])).toBe(hook.secret);
+    describe('WHEN a log is started with only the new key', () => {
+      let onlyNew: any;
+      beforeEach(async () => { onlyNew = await buildLog({ store: h.store, secretBox: boxOf(h.newKey) }); });
+
+      it('THEN the secret still decrypts', () => {
+        expect(onlyNew.webhookSecret(h.store.webhooks[0])).toBe(h.hook.secret);
       });
     });
   });
@@ -291,42 +355,67 @@ describe('rotation re-encrypts everything under the current key', () => {
 
 describe('a persistent store requires an explicit secret box; memory stores get an ephemeral one', () => {
   describe('GIVEN a SQLite store', () => {
+    let store: any;
+    beforeEach(() => {
+      store = SqliteStore.open(tmpDbFile('dl-sec-'));
+      onCleanup(() => store.close());
+    });
+
     describe('WHEN a log is built without a secret box', () => {
+      let building: Promise<unknown>;
+      beforeEach(() => {
+        building = buildLog({ store });
+        building.catch(() => {}); // observed in THEN
+      });
+
       it('THEN it refuses to start', async () => {
-        const store = SqliteStore.open(tmpDbFile('dl-sec-'));
-        await expect(buildLog({ store })).rejects.toThrow(/SECRETS_KEY|secretBox/);
-        store.close();
+        await expect(building).rejects.toThrow(/SECRETS_KEY|secretBox/);
       });
     });
   });
 
-  describe('GIVEN a SQLite store with a secret box', () => {
-    describe('WHEN a webhook is committed', () => {
-      it('THEN the plaintext never reaches the database file', async () => {
-        // Given
-        const file = tmpDbFile('dl-sec-');
-        const store = SqliteStore.open(file);
-        const log = await buildLog({ store, secretBox: boxOf(key()) });
-        log.createOwner({ identifier: 'acme' });
-        const hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' });
-        // When
+  describe('GIVEN a SQLite store with a secret box and a webhook', () => {
+    let file: string;
+    let store: any;
+    let hook: any;
+    beforeEach(async () => {
+      file = tmpDbFile('dl-sec-');
+      store = SqliteStore.open(file);
+      onCleanup(() => store.close());
+      const log = await buildLog({ store, secretBox: boxOf(key()) });
+      log.createOwner({ identifier: 'acme' });
+      hook = log.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' });
+    });
+
+    describe('WHEN the store is committed', () => {
+      let stored: string;
+      beforeEach(async () => {
         store.commit();
-        // Then
         const db = new SQL({ adapter: 'sqlite', filename: file, readonly: true });
         const [{ json }] = await db`SELECT json FROM docs WHERE coll = 'webhooks'`;
         await db.close();
-        expect(String(json).includes(hook.secret)).toBe(false);
-        store.close();
+        stored = String(json);
+      });
+
+      it('THEN the plaintext never reaches the database file', () => {
+        expect(stored).not.toContain(hook.secret);
       });
     });
   });
 
   describe('GIVEN no store and no secret box', () => {
+    let memory: any;
+    beforeEach(async () => {
+      memory = await buildLog({});
+      memory.createOwner({ identifier: 'acme' });
+    });
+
     describe('WHEN a webhook is created', () => {
-      it('THEN an ephemeral box still yields a secret', async () => {
-        const memory = await buildLog({});
-        memory.createOwner({ identifier: 'acme' });
-        expect(memory.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' }).secret).toBeTruthy();
+      let hook: any;
+      beforeEach(() => { hook = memory.createWebhook({ owner: 'acme', url: HOOK_URL, actor: 'acme' }); });
+
+      it('THEN an ephemeral box still yields a secret', () => {
+        expect(hook.secret).toBeTruthy();
       });
     });
   });
