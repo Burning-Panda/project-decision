@@ -2,7 +2,7 @@ import { expect } from 'bun:test';
 import { makeClock } from './clock';
 import { randomBytes } from './crypto';
 import { U, CONTENT_V1 } from './fixtures';
-import { buildLog, SecretBox } from './target';
+import { buildLog, buildModule, SecretBox } from './target';
 
 /** A fresh random-key SecretBox for tests that use persistent stores. */
 export const testBox = () => new SecretBox({ keys: [randomBytes(32)] });
@@ -55,4 +55,11 @@ export function expectCode(fn: () => unknown, code: string, status?: number): an
   expect(error.code, `expected ${code}, got ${error.code}: ${error.message}`).toBe(code);
   if (status) expect(error.status).toBe(status);
   return error;
+}
+
+/** A fixed clock plus a booted module, for specs that exercise parts directly. `get(X)` shares one store. */
+export async function partsSetup(startAt?: string) {
+  const clock = makeClock(startAt);
+  const { get } = await buildModule({ clock: clock.now });
+  return { get, clock };
 }
