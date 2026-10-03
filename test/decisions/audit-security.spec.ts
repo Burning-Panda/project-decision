@@ -417,3 +417,22 @@ describe('new entries can extend a legacy chain', () => {
     });
   });
 });
+
+describe('an idempotency key cannot be reused for a different request', () => {
+  describe('GIVEN bob\'s approve vote cast with key K', () => {
+    const h = proposedIn(CONSENSUS);
+    const KEY = { idempotencyKey: 'vote-bob-prj001' };
+    beforeEach(() => { act(h.log, h.id, U.bob, 'vote', { vote: 'approve' }, KEY); });
+
+    describe('WHEN K is sent again with a request_revision vote', () => {
+      let error: any;
+      beforeEach(() => { error = attempt(() => act(h.log, h.id, U.bob, 'vote', { vote: 'request_revision', comment: 'changed' }, KEY)); });
+
+      it('THEN CONFLICT 409 and the original vote stands', () => {
+        expect(error?.code).toBe('CONFLICT');
+        expect(error?.status).toBe(409);
+        expect(h.log.getDecision(h.id, U.bob).vote_tally).toEqual({ approve: 1, request_revision: 0, abstain: 0 });
+      });
+    });
+  });
+});

@@ -444,3 +444,29 @@ describe('export as JSON includes votes; CSV escapes properly', () => {
     });
   });
 });
+
+describe('export is for org admins, in json or csv only', () => {
+  describe('GIVEN three decisions', () => {
+    const h = seeded();
+
+    for (const [who, actor] of [['a plain member', U.bob], ['an outsider', U.outsider]]) {
+      describe(`WHEN ${who} exports`, () => {
+        let run: () => unknown;
+        beforeEach(() => { run = () => h.log.exportDecisions({ actor, format: 'json' }); });
+
+        it('THEN FORBIDDEN 403', () => {
+          expectCode(run, 'FORBIDDEN', 403);
+        });
+      });
+    }
+
+    describe('WHEN the org admin exports as xml', () => {
+      let run: () => unknown;
+      beforeEach(() => { run = () => h.log.exportDecisions({ actor: U.org, format: 'xml' }); });
+
+      it('THEN VALIDATION_ERROR 400', () => {
+        expectCode(run, 'VALIDATION_ERROR', 400);
+      });
+    });
+  });
+});

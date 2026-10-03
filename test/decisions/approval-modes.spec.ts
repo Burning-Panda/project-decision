@@ -547,3 +547,92 @@ describe('without weights the same lead vote is not enough', () => {
     });
   });
 });
+
+// ---- configurable thresholds ----
+describe('consensus thresholds can be configured', () => {
+  describe('GIVEN consensus_min_votes=2 and one approval', () => {
+    const h = proposedIn({ ...CONSENSUS, consensus_min_votes: 2 });
+    beforeEach(() => { vote(h.log, h.id, U.bob, 'approve'); });
+
+    describe('WHEN carol approves', () => {
+      let r: any;
+      beforeEach(() => { r = vote(h.log, h.id, U.carol, 'approve'); });
+
+      it('THEN 202 and the decision is approved with two votes', () => {
+        expect(r.status_code).toBe(202);
+        expect(r.decision.status).toBe('approved');
+      });
+    });
+  });
+
+  describe('GIVEN consensus_approval_threshold=0.6, two approvals and one revision request', () => {
+    const h = proposedIn({ ...CONSENSUS, consensus_approval_threshold: 0.6 });
+    beforeEach(() => {
+      vote(h.log, h.id, U.bob, 'approve');
+      vote(h.log, h.id, U.carol, 'request_revision', 'need monitoring docs');
+      vote(h.log, h.id, U.david, 'approve');
+    });
+
+    describe('WHEN the fourth voter approves (75%, which the default 80% rejects)', () => {
+      let r: any;
+      beforeEach(() => { r = vote(h.log, h.id, U.lead, 'approve'); });
+
+      it('THEN the decision is approved', () => {
+        expect(r.decision.status).toBe('approved');
+      });
+    });
+  });
+});
+
+describe('require_reason_on_revision=false lets a revision vote omit its reason', () => {
+  describe('GIVEN consensus mode with require_reason_on_revision=false and a proposed decision', () => {
+    const h = proposedIn({ ...CONSENSUS, require_reason_on_revision: false });
+
+    describe('WHEN bob votes request_revision without a reason', () => {
+      let r: any;
+      beforeEach(() => { r = vote(h.log, h.id, U.bob, 'request_revision'); });
+
+      it('THEN the vote is counted', () => {
+        expect(r.status_code).toBe(200);
+        expect(r.metadata.vote_tally).toEqual({ approve: 0, request_revision: 1, abstain: 0 });
+      });
+    });
+  });
+});
+
+describe('single approval with enabled_voting=true: votes are advisory', () => {
+  describe('GIVEN single_approval with voting enabled and a proposed decision', () => {
+    const h = proposedIn({ mode: 'single_approval', enabled_voting: true });
+
+    describe('WHEN bob votes approve', () => {
+      let r: any;
+      beforeEach(() => { r = vote(h.log, h.id, U.bob, 'approve'); });
+
+      it('THEN the vote is tallied but the decision still waits for a lead', () => {
+        expect(r.status_code).toBe(200);
+        expect(r.metadata.vote_tally.approve).toBe(1);
+        expect(r.decision.status).toBe('proposed');
+      });
+    });
+  });
+});
+
+describe('veto: sweeping is idempotent', () => {
+  describe('GIVEN a decision auto-approved by a sweep on day 7', () => {
+    const h = proposedIn(VETO_7_DAYS);
+    beforeEach(() => {
+      h.clock.advanceDays(7);
+      h.log.sweep();
+    });
+
+    describe('WHEN a sweep runs again', () => {
+      let swept: string[];
+      beforeEach(() => { swept = h.log.sweep(); });
+
+      it('THEN nothing more is swept and it stays approved', () => {
+        expect(swept).toEqual([]);
+        expect(h.log.getDecision(h.id, U.alice).status).toBe('approved');
+      });
+    });
+  });
+});

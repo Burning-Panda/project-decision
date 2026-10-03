@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { freshLog, draft, proposed, act, expectCode, U, CONTENT_V1, type LogHandle } from '../support/index';
+import { freshLog, proposedIn, draft, proposed, act, expectCode, U, CONTENT_V1, type LogHandle } from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.
@@ -605,6 +605,53 @@ describe('renderDecisionDocument produces the standard header, approvers and sec
         expect(md).toMatch(/- Owner: alice@acme.com/);
         expect(md).toMatch(/lead@acme.com - Approved on 2024-03-20/);
         expect(md).toMatch(/## Decision/);
+      });
+    });
+  });
+});
+
+describe('only a lead or an admin may decline, whatever the approval mode', () => {
+  const REASON = 'Too risky without rollback plan';
+  const refused: Array<[string, string]> = [['a member', U.bob], ['its owner', U.alice], ['an outsider', U.outsider]];
+
+  for (const [who, actor] of refused) {
+    describe('GIVEN a proposed decision', () => {
+      const h = proposedIn();
+
+      describe(`WHEN ${who} declines it`, () => {
+        let decline: () => unknown;
+        beforeEach(() => { decline = () => act(h.log, h.id, actor, 'decline', { reason: REASON }); });
+
+        it('THEN FORBIDDEN 403', () => {
+          expectCode(decline, 'FORBIDDEN', 403);
+        });
+      });
+    });
+  }
+
+  describe('GIVEN a proposed decision', () => {
+    const h = proposedIn();
+
+    describe('WHEN the org admin declines it', () => {
+      let r: any;
+      beforeEach(() => { r = act(h.log, h.id, U.org, 'decline', { reason: REASON }); });
+
+      it('THEN it is declined', () => {
+        expect(r.decision.status).toBe('declined');
+      });
+    });
+  });
+
+  describe('GIVEN consensus mode and a proposed decision', () => {
+    const h = proposedIn({ mode: 'consensus_voting' });
+
+    describe('WHEN the lead declines it', () => {
+      let r: any;
+      beforeEach(() => { r = act(h.log, h.id, U.lead, 'decline', { reason: REASON }); });
+
+      it('THEN it is declined outright, not counted as a vote', () => {
+        expect(r.decision.status).toBe('declined');
+        expect(r.decision.vote_tally.request_revision).toBe(0);
       });
     });
   });

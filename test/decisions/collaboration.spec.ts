@@ -387,3 +387,78 @@ describe('notification_on_vote=false suppresses vote notifications', () => {
     });
   });
 });
+
+describe('the comment author and the decision owner may resolve a comment; others may not', () => {
+  describe('GIVEN bob\'s open comment on alice\'s decision', () => {
+    const h = withBobsComment('question?');
+
+    describe('WHEN bob, its author, resolves it', () => {
+      let c: any;
+      beforeEach(() => { c = h.log.resolveComment(h.id, h.c.id, U.bob); });
+
+      it('THEN it is resolved', () => {
+        expect(c.resolved).toBe(true);
+      });
+    });
+
+    describe('WHEN carol, another member, resolves it', () => {
+      let resolve: () => unknown;
+      beforeEach(() => { resolve = () => h.log.resolveComment(h.id, h.c.id, U.carol); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(resolve, 'FORBIDDEN', 403);
+      });
+    });
+
+    describe('WHEN an outsider resolves it', () => {
+      let resolve: () => unknown;
+      beforeEach(() => { resolve = () => h.log.resolveComment(h.id, h.c.id, U.outsider); });
+
+      it('THEN FORBIDDEN 403', () => {
+        expectCode(resolve, 'FORBIDDEN', 403);
+      });
+    });
+  });
+});
+
+describe('the edit window includes the fifth minute', () => {
+  describe('GIVEN bob\'s comment, exactly 5 minutes old', () => {
+    const h = withBobsComment();
+    beforeEach(() => { h.clock.advanceMinutes(5); });
+
+    describe('WHEN bob edits it', () => {
+      let edited: any;
+      beforeEach(() => { edited = h.log.editComment(h.id, h.c.id, U.bob, 'just in time'); });
+
+      it('THEN the edit is accepted', () => {
+        expect(edited.content).toBe('just in time');
+      });
+    });
+  });
+});
+
+describe('notifications: the owner hears the outcome of a proposal', () => {
+  describe('GIVEN alice\'s proposed decision', () => {
+    const h = proposedIn();
+
+    describe('WHEN the lead approves it', () => {
+      beforeEach(() => { act(h.log, h.id, U.lead, 'approve'); });
+
+      it('THEN alice gets a decision_approved notification for it', () => {
+        expect(h.log.listNotifications(U.alice).some((n: any) => n.type === 'decision_approved' && n.decision_id === h.id)).toBe(true);
+      });
+
+      it('THEN the lead, who acted, is not notified', () => {
+        expect(h.log.listNotifications(U.lead).some((n: any) => n.type === 'decision_approved')).toBe(false);
+      });
+    });
+
+    describe('WHEN the lead declines it', () => {
+      beforeEach(() => { act(h.log, h.id, U.lead, 'decline', { reason: 'no' }); });
+
+      it('THEN alice gets a decision_declined notification for it', () => {
+        expect(h.log.listNotifications(U.alice).some((n: any) => n.type === 'decision_declined' && n.decision_id === h.id)).toBe(true);
+      });
+    });
+  });
+});
