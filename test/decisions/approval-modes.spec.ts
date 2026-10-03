@@ -565,8 +565,9 @@ describe('consensus thresholds can be configured', () => {
     });
   });
 
-  describe('GIVEN consensus_approval_threshold=0.6, two approvals and one revision request', () => {
-    const h = proposedIn({ ...CONSENSUS, consensus_approval_threshold: 0.6 });
+  // Four votes are required so the decision stays open after three (with 0.6, two approvals of three would already pass).
+  describe('GIVEN consensus_approval_threshold=0.6 with 4 votes required, two approvals and one revision request', () => {
+    const h = proposedIn({ ...CONSENSUS, consensus_approval_threshold: 0.6, consensus_min_votes: 4 });
     beforeEach(() => {
       vote(h.log, h.id, U.bob, 'approve');
       vote(h.log, h.id, U.carol, 'request_revision', 'need monitoring docs');
