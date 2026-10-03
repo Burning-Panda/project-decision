@@ -18,4 +18,6 @@ export class WebhooksService {
   secret(_hook: { id: string; secret_enc: string }): string { throw new NotImplementedError('WebhooksService.secret'); }
   pruneOutbox(_opts?: { olderThanDays?: number }): any { throw new NotImplementedError('WebhooksService.pruneOutbox'); }
   pruneChannelDeliveries(_opts?: { olderThanDays?: number }): any { throw new NotImplementedError('WebhooksService.pruneChannelDeliveries'); }
+  /** Re-encrypts every webhook secret not under the box's current key; returns how many were rewritten. */
+  rotateSecrets(): { rotated: number } { throw new NotImplementedError('WebhooksService.rotateSecrets'); }
 }

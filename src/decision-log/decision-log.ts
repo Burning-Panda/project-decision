@@ -44,6 +44,9 @@ export class DecisionLog {
   get options() { return this.ctx.options; }
   get store() { return this.ctx.store; }
   get clock() { return this.ctx.options.clock ?? (() => new Date()); }
+  /** Lets webhooks target private and loopback addresses (local development only). Kept in the shared options. */
+  get allowPrivateTargets(): boolean { return Boolean(this.ctx.options.allowPrivateTargets); }
+  set allowPrivateTargets(allow: boolean) { this.ctx.options.allowPrivateTargets = allow; }
 
   // owners, teams, projects
   createOwner(input: CreateOwnerDto) { return this.owners.create(input); }
@@ -102,6 +105,7 @@ export class DecisionLog {
   webhookSecret(hook: { id: string; secret_enc: string }) { return this.webhooks.secret(hook); }
   pruneOutbox(opts: { olderThanDays?: number } = {}) { return this.webhooks.pruneOutbox(opts); }
   pruneChannelDeliveries(opts: { olderThanDays?: number } = {}) { return this.webhooks.pruneChannelDeliveries(opts); }
+  rotateSecrets() { return this.webhooks.rotateSecrets(); }
 
   // insights and audit
   search(args: Record<string, any>) { return this.insights.search(args as any); }
