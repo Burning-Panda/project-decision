@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import { LogContext } from './log-context.js';
+import { todo } from '../../helpers/errors/todo';
+import { LogContext } from './log-context';
 
 /** Append-only, hash-chained audit log. Every mutating service writes through here. */
 @Injectable()

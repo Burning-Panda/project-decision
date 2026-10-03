@@ -1,4 +1,4 @@
-import { todo } from '../helpers/errors/todo.js';
+import { todo } from '../helpers/errors/todo';
 
 export class NotificationChannel {
   constructor() {

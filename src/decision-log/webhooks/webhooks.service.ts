@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateWebhookDto } from '../../webhooks/dto/create-webhook.dto.js';
-import type { ListDeliveriesQueryDto } from '../../webhooks/dto/list-deliveries-query.dto.js';
-import { AccessService } from '../core/access.service.js';
-import { LogContext } from '../core/log-context.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateWebhookDto } from '../../webhooks/dto/create-webhook.dto';
+import type { ListDeliveriesQueryDto } from '../../webhooks/dto/list-deliveries-query.dto';
+import { AccessService } from '../core/access.service';
+import { LogContext } from '../core/log-context';
 
 /** Webhook registry and delivery log. Sending itself stays in WebhookDispatcher. */
 @Injectable()

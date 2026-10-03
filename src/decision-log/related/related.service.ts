@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import { LogContext } from '../core/log-context.js';
-import { DecisionsService } from '../decisions/decisions.service.js';
+import { todo } from '../../helpers/errors/todo';
+import { LogContext } from '../core/log-context';
+import { DecisionsService } from '../decisions/decisions.service';
 
 /** Related-decision suggestions (pluggable finder, threshold) and manual links. */
 @Injectable()

@@ -1,18 +1,18 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, DiscoveryModule } from '@nestjs/core';
-import { AdminModule } from '../admin/admin.module.js';
-import { DecisionsModule } from '../decisions/decisions.module.js';
-import { InsightsModule } from '../insights/insights.module.js';
-import { ProfileModule } from '../profile/profile.module.js';
-import { TodosModule } from '../todos/todos.module.js';
-import { UiModule } from '../ui/ui.module.js';
-import { WebhooksModule } from '../webhooks/webhooks.module.js';
-import { type ApiOptions } from './api-options.js';
-import { ApiCoreModule } from './api-core.module.js';
-import { DecisionLogErrorFilter } from './decision-log-error.filter.js';
-import { IdempotencyInterceptor } from './idempotency.interceptor.js';
-import { OnMutationInterceptor } from './on-mutation.interceptor.js';
-import { RouteTable } from './route-table.js';
+import { AdminModule } from '../admin/admin.module';
+import { DecisionsModule } from '../decisions/decisions.module';
+import { InsightsModule } from '../insights/insights.module';
+import { ProfileModule } from '../profile/profile.module';
+import { TodosModule } from '../todos/todos.module';
+import { UiModule } from '../ui/ui.module';
+import { WebhooksModule } from '../webhooks/webhooks.module';
+import { type ApiOptions } from './api-options';
+import { ApiCoreModule } from './api-core.module';
+import { DecisionLogErrorFilter } from './decision-log-error.filter';
+import { IdempotencyInterceptor } from './idempotency.interceptor';
+import { OnMutationInterceptor } from './on-mutation.interceptor';
+import { RouteTable } from './route-table';
 
 /** The HTTP API: composes the feature modules and the cross-cutting filter/interceptors. */
 @Module({})

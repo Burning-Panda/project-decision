@@ -1,4 +1,4 @@
-import { todo } from '../helpers/errors/todo.js';
+import { todo } from '../helpers/errors/todo';
 
 export const buildMimeMessage = (_message: Record<string, any>): string => todo('buildMimeMessage');
 export const formatAddress = (_address: { name: string | null; address: string }): string => todo('formatAddress');

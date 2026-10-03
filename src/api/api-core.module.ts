@@ -1,6 +1,6 @@
 import { DynamicModule, Global, Module } from '@nestjs/common';
-import { DecisionLog } from '../decision-log/decision-log.js';
-import { API_OPTIONS, type ApiOptions } from './api-options.js';
+import { DecisionLog } from '../decision-log/decision-log';
+import { API_OPTIONS, type ApiOptions } from './api-options';
 
 /** Makes the injected DecisionLog and API options visible to every feature module. */
 @Global()

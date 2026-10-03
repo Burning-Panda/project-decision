@@ -1,4 +1,4 @@
-import { MeetingSegmentDto } from './meeting-segment.dto.js';
+import { MeetingSegmentDto } from './meeting-segment.dto';
 
 export class AddMeetingPayloadDto {
   recorded_at?: string;

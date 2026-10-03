@@ -1,9 +1,9 @@
 import { Controller, Body, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { CreateWebhookDto } from './dto/create-webhook.dto.js';
-import { ListWebhooksQueryDto } from './dto/list-webhooks-query.dto.js';
-import { ListDeliveriesQueryDto } from './dto/list-deliveries-query.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { CreateWebhookDto } from './dto/create-webhook.dto';
+import { ListWebhooksQueryDto } from './dto/list-webhooks-query.dto';
+import { ListDeliveriesQueryDto } from './dto/list-deliveries-query.dto';
 
 @Controller()
 @UseGuards(XUserGuard)

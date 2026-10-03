@@ -1,6 +1,6 @@
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateProjectDto } from '../../admin/dto/create-project.dto.js';
-import type { ApprovalSettingsDto } from '../../admin/dto/approval-settings.dto.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateProjectDto } from '../../admin/dto/create-project.dto';
+import type { ApprovalSettingsDto } from '../../admin/dto/approval-settings.dto';
 
 export interface ProjectRecord {
   owner: string;

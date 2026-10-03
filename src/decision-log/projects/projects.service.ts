@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateProjectDto } from '../../admin/dto/create-project.dto.js';
-import type { ProjectSettingsDto } from '../../admin/dto/project-settings.dto.js';
-import { AccessService } from '../core/access.service.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import { TeamsService } from '../teams/teams.service.js';
-import type { ProjectRecord } from './project.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateProjectDto } from '../../admin/dto/create-project.dto';
+import type { ProjectSettingsDto } from '../../admin/dto/project-settings.dto';
+import { AccessService } from '../core/access.service';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import { TeamsService } from '../teams/teams.service';
+import type { ProjectRecord } from './project';
 
 @Injectable()
 export class ProjectsService {

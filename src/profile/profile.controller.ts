@@ -1,8 +1,8 @@
 import { Controller, Body, Get, Put, Query, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { ProfileQueryDto } from './dto/profile-query.dto.js';
-import { UpdateProfileDto } from './dto/update-profile.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { ProfileQueryDto } from './dto/profile-query.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('profile')
 @UseGuards(XUserGuard)

@@ -1,4 +1,4 @@
-import { NotificationPreferencesDto } from './notification-preferences.dto.js';
+import { NotificationPreferencesDto } from './notification-preferences.dto';
 
 export class UpdateProfileDto {
   email?: string;

@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateOwnerDto } from '../../admin/dto/create-owner.dto.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import type { Owner } from './owner.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateOwnerDto } from '../../admin/dto/create-owner.dto';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import type { Owner } from './owner';
 
 @Injectable()
 export class OwnersService {
@@ -11,6 +11,7 @@ export class OwnersService {
 
   /** Creates the owner and its empty `default` team. INVALID without identifier, CONFLICT if taken. */
   create(_input: CreateOwnerDto): Owner {
+
     return todo('OwnersService.create');
   }
 

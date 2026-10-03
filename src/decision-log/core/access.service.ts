@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { Team } from '../teams/team.js';
+import { todo } from '../../helpers/errors/todo';
+import type { Team } from '../teams/team';
 
 /** Who may do what. Pure authorization rules; no persistence of its own. */
 @Injectable()

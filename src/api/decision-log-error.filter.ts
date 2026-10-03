@@ -1,9 +1,9 @@
 import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { describeError, errorEnvelope } from '../helpers/errors/error-response.js';
-import { actionAttempted } from '../helpers/http/action-attempted.js';
-import { stampHeaders } from '../helpers/http/stamp-headers.js';
-import { RouteTable } from './route-table.js';
+import { describeError, errorEnvelope } from '../helpers/errors/error-response';
+import { actionAttempted } from '../helpers/http/action-attempted';
+import { stampHeaders } from '../helpers/http/stamp-headers';
+import { RouteTable } from './route-table';
 
 /** Every failure leaves the API in the standard envelope: { success:false, status_code, error:{code,message}, timestamp }. */
 @Catch()

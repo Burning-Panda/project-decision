@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateTeamDto } from '../../admin/dto/create-team.dto.js';
-import type { AddTeamMemberDto } from '../../admin/dto/add-team-member.dto.js';
-import { AccessService } from '../core/access.service.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import { OwnersService } from '../owners/owners.service.js';
-import type { Team } from './team.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateTeamDto } from '../../admin/dto/create-team.dto';
+import type { AddTeamMemberDto } from '../../admin/dto/add-team-member.dto';
+import { AccessService } from '../core/access.service';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import { OwnersService } from '../owners/owners.service';
+import type { Team } from './team';
 
 @Injectable()
 export class TeamsService {

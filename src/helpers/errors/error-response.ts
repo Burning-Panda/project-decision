@@ -1,5 +1,5 @@
 import { HttpException } from '@nestjs/common';
-import { DecisionLogError } from '../../common/errors.js';
+import { DecisionLogError } from '../../common/errors';
 
 export interface ErrorDescriptor { status: number; error: Record<string, unknown> }
 

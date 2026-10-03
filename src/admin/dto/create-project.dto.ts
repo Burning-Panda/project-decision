@@ -1,4 +1,4 @@
-import { ProjectSettingsDto } from './project-settings.dto.js';
+import { ProjectSettingsDto } from './project-settings.dto';
 
 export class CreateProjectDto {
   owner: string;

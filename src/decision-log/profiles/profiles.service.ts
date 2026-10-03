@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { UpdateProfileDto } from '../../profile/dto/update-profile.dto.js';
-import { LogContext } from '../core/log-context.js';
+import { todo } from '../../helpers/errors/todo';
+import type { UpdateProfileDto } from '../../profile/dto/update-profile.dto';
+import { LogContext } from '../core/log-context';
 
 /** User profiles, notification preferences and the in-app notification inbox. */
 @Injectable()

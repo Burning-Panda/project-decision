@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { AddCommentDto } from '../../decisions/dto/add-comment.dto.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import { DecisionsService } from '../decisions/decisions.service.js';
+import { todo } from '../../helpers/errors/todo';
+import type { AddCommentDto } from '../../decisions/dto/add-comment.dto';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import { DecisionsService } from '../decisions/decisions.service';
 
 @Injectable()
 export class CommentsService {

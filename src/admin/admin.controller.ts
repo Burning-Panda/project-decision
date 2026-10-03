@@ -1,10 +1,10 @@
 import { Controller, Body, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { CreateOwnerDto } from './dto/create-owner.dto.js';
-import { CreateTeamDto } from './dto/create-team.dto.js';
-import { AddTeamMemberDto } from './dto/add-team-member.dto.js';
-import { CreateProjectDto } from './dto/create-project.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { CreateOwnerDto } from './dto/create-owner.dto';
+import { CreateTeamDto } from './dto/create-team.dto';
+import { AddTeamMemberDto } from './dto/add-team-member.dto';
+import { CreateProjectDto } from './dto/create-project.dto';
 
 @Controller()
 @UseGuards(XUserGuard)

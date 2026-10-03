@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { CreateDecisionDto } from '../../decisions/dto/create-decision.dto.js';
-import type { ListDecisionsQueryDto } from '../../decisions/dto/list-decisions-query.dto.js';
-import type { PerformActionDto } from '../../decisions/dto/perform-action.dto.js';
-import type { DiffQueryDto } from '../../decisions/dto/diff-query.dto.js';
-import { AccessService } from '../core/access.service.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import { ProjectsService } from '../projects/projects.service.js';
+import { todo } from '../../helpers/errors/todo';
+import type { CreateDecisionDto } from '../../decisions/dto/create-decision.dto';
+import type { ListDecisionsQueryDto } from '../../decisions/dto/list-decisions-query.dto';
+import type { PerformActionDto } from '../../decisions/dto/perform-action.dto';
+import type { DiffQueryDto } from '../../decisions/dto/diff-query.dto';
+import { AccessService } from '../core/access.service';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import { ProjectsService } from '../projects/projects.service';
 
 /** Lifecycle: draft -> proposed -> approved | declined, plus revisions and integrity. */
 @Injectable()

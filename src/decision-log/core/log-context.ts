@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { MemoryStore } from '../../storage/store.js';
+import { MemoryStore } from '../../storage/store';
 
 export const DECISION_LOG_OPTIONS = Symbol('DECISION_LOG_OPTIONS');
 

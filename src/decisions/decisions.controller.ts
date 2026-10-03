@@ -1,12 +1,12 @@
 import { Controller, Body, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { CreateDecisionDto } from './dto/create-decision.dto.js';
-import { ListDecisionsQueryDto } from './dto/list-decisions-query.dto.js';
-import { PerformActionDto } from './dto/perform-action.dto.js';
-import { VersionsQueryDto } from './dto/versions-query.dto.js';
-import { DiffQueryDto } from './dto/diff-query.dto.js';
-import { AddCommentDto } from './dto/add-comment.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { CreateDecisionDto } from './dto/create-decision.dto';
+import { ListDecisionsQueryDto } from './dto/list-decisions-query.dto';
+import { PerformActionDto } from './dto/perform-action.dto';
+import { VersionsQueryDto } from './dto/versions-query.dto';
+import { DiffQueryDto } from './dto/diff-query.dto';
+import { AddCommentDto } from './dto/add-comment.dto';
 
 @Controller('decisions')
 @UseGuards(XUserGuard)

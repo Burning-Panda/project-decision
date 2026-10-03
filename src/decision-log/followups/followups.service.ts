@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { AssignFollowupPayloadDto } from '../../decisions/dto/actions/assign-followup-payload.dto.js';
-import type { AddMeetingPayloadDto } from '../../decisions/dto/actions/add-meeting-payload.dto.js';
-import type { ListTodosQueryDto } from '../../todos/dto/list-todos-query.dto.js';
-import type { UpdateTodoDto } from '../../todos/dto/update-todo.dto.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
-import { DecisionsService } from '../decisions/decisions.service.js';
+import { todo } from '../../helpers/errors/todo';
+import type { AssignFollowupPayloadDto } from '../../decisions/dto/actions/assign-followup-payload.dto';
+import type { AddMeetingPayloadDto } from '../../decisions/dto/actions/add-meeting-payload.dto';
+import type { ListTodosQueryDto } from '../../todos/dto/list-todos-query.dto';
+import type { UpdateTodoDto } from '../../todos/dto/update-todo.dto';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
+import { DecisionsService } from '../decisions/decisions.service';
 
 /** Follow-ups, the todo view of them, and meeting notes. */
 @Injectable()

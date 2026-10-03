@@ -1,18 +1,18 @@
 import { DynamicModule, Module } from '@nestjs/common';
-import { DecisionLog } from './decision-log.js';
-import { DECISION_LOG_OPTIONS, LogContext } from './core/log-context.js';
-import { AccessService } from './core/access.service.js';
-import { AuditService } from './core/audit.service.js';
-import { OwnersService } from './owners/owners.service.js';
-import { TeamsService } from './teams/teams.service.js';
-import { ProjectsService } from './projects/projects.service.js';
-import { DecisionsService } from './decisions/decisions.service.js';
-import { CommentsService } from './comments/comments.service.js';
-import { FollowupsService } from './followups/followups.service.js';
-import { RelatedService } from './related/related.service.js';
-import { ProfilesService } from './profiles/profiles.service.js';
-import { WebhooksService } from './webhooks/webhooks.service.js';
-import { InsightsService } from './insights/insights.service.js';
+import { DecisionLog } from './decision-log';
+import { DECISION_LOG_OPTIONS, LogContext } from './core/log-context';
+import { AccessService } from './core/access.service';
+import { AuditService } from './core/audit.service';
+import { OwnersService } from './owners/owners.service';
+import { TeamsService } from './teams/teams.service';
+import { ProjectsService } from './projects/projects.service';
+import { DecisionsService } from './decisions/decisions.service';
+import { CommentsService } from './comments/comments.service';
+import { FollowupsService } from './followups/followups.service';
+import { RelatedService } from './related/related.service';
+import { ProfilesService } from './profiles/profiles.service';
+import { WebhooksService } from './webhooks/webhooks.service';
+import { InsightsService } from './insights/insights.service';
 
 export { DECISION_LOG_OPTIONS };
 

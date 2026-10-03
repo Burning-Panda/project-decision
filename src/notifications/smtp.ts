@@ -1,4 +1,4 @@
-import { todo } from '../helpers/errors/todo.js';
+import { todo } from '../helpers/errors/todo';
 
 export class SmtpError extends Error {
   code: number | null = null;

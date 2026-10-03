@@ -1,8 +1,8 @@
 import { Controller, Body, Get, Param, Patch, Query, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { ListTodosQueryDto } from './dto/list-todos-query.dto.js';
-import { UpdateTodoDto } from './dto/update-todo.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { ListTodosQueryDto } from './dto/list-todos-query.dto';
+import { UpdateTodoDto } from './dto/update-todo.dto';
 
 @Controller('todos')
 @UseGuards(XUserGuard)

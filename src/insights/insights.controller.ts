@@ -1,9 +1,9 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
-import { XUserGuard } from '../common/x-user.guard.js';
-import { todo } from '../helpers/errors/todo.js';
-import { SearchQueryDto } from './dto/search-query.dto.js';
-import { ReportQueryDto } from './dto/report-query.dto.js';
-import { ExportQueryDto } from './dto/export-query.dto.js';
+import { XUserGuard } from '../common/x-user.guard';
+import { todo } from '../helpers/errors/todo';
+import { SearchQueryDto } from './dto/search-query.dto';
+import { ReportQueryDto } from './dto/report-query.dto';
+import { ExportQueryDto } from './dto/export-query.dto';
 
 @Controller()
 @UseGuards(XUserGuard)

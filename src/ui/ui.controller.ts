@@ -1,6 +1,6 @@
 import { Controller, Get, HttpCode, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import { sendAsset } from '../helpers/files/send-asset.js';
+import { sendAsset } from '../helpers/files/send-asset';
 
 const PUBLIC_DIR = new URL('../../public/', import.meta.url).pathname;
 
@@ -12,9 +12,9 @@ export class UiController {
     return sendAsset(res, PUBLIC_DIR + 'index.html', 'text/html');
   }
 
-  @Get('app.js')
+  @Get('app')
   script(@Res() res: Response) {
-    return sendAsset(res, PUBLIC_DIR + 'app.js', 'text/javascript');
+    return sendAsset(res, PUBLIC_DIR + 'app', 'text/javascript');
   }
 
   @Get('style.css')

@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { todo } from '../../helpers/errors/todo.js';
-import type { SearchQueryDto } from '../../insights/dto/search-query.dto.js';
-import type { ReportQueryDto } from '../../insights/dto/report-query.dto.js';
-import type { ExportQueryDto } from '../../insights/dto/export-query.dto.js';
-import { AuditService } from '../core/audit.service.js';
-import { LogContext } from '../core/log-context.js';
+import { todo } from '../../helpers/errors/todo';
+import type { SearchQueryDto } from '../../insights/dto/search-query.dto';
+import type { ReportQueryDto } from '../../insights/dto/report-query.dto';
+import type { ExportQueryDto } from '../../insights/dto/export-query.dto';
+import { AuditService } from '../core/audit.service';
+import { LogContext } from '../core/log-context';
 
 /** Read-only views over decisions: search, reports, dashboard, export, audit trail. */
 @Injectable()

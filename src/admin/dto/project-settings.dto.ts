@@ -1,4 +1,4 @@
-import { ApprovalSettingsDto } from './approval-settings.dto.js';
+import { ApprovalSettingsDto } from './approval-settings.dto';
 
 export class ProjectSettingsDto {
   approval_settings?: ApprovalSettingsDto;

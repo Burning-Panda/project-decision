@@ -1,4 +1,4 @@
-import { todo } from '../helpers/errors/todo.js';
+import { todo } from '../helpers/errors/todo';
 
 export const MAP_COLLECTIONS = ['owners', 'teams', 'projects', 'decisions', 'revisions', 'profiles'];
 export const ARRAY_COLLECTIONS = ['votes', 'comments', 'followups', 'meetings', 'relationships', 'participants', 'audit', 'notifications', 'webhooks', 'events', 'deliveries', 'channel_deliveries'];

@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import type { Request } from 'express';
-import { readActor } from '../helpers/auth/read-actor.js';
-import { DecisionLogError } from './errors.js';
+import { readActor } from '../helpers/auth/read-actor';
+import { DecisionLogError } from './errors';
 
 /** Stand-in authentication: the caller is whoever the X-User header says. Replace with real auth before exposing publicly. */
 @Injectable()

@@ -1,7 +1,7 @@
 import { Injectable, RequestMethod } from '@nestjs/common';
 import { DiscoveryService } from '@nestjs/core';
-import { joinRoutePath } from '../helpers/routing/join-route-path.js';
-import { routePattern } from '../helpers/routing/route-pattern.js';
+import { joinRoutePath } from '../helpers/routing/join-route-path';
+import { routePattern } from '../helpers/routing/route-pattern';
 
 interface Entry { method: string; re: RegExp }
 

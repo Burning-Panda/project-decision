@@ -1,7 +1,7 @@
 import { CallHandler, ExecutionContext, Inject, Injectable, NestInterceptor } from '@nestjs/common';
 import type { Request } from 'express';
 import { mergeMap } from 'rxjs';
-import { API_OPTIONS, type ApiOptions } from './api-options.js';
+import { API_OPTIONS, type ApiOptions } from './api-options';
 
 /** Durable-before-ack: awaits onMutation() after a successful write and before the response is sent. */
 @Injectable()
