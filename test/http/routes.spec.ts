@@ -42,6 +42,24 @@ describe('every route is registered', () => {
   }
 });
 
+describe('an empty X-User is the same as none', () => {
+  for (const [label, value] of [['empty', ''], ['whitespace-only', '   ']]) {
+    describe('GIVEN a running API', () => {
+      const api = runningApi();
+
+      describe(`WHEN GET /decisions is sent with an ${label} X-User`, () => {
+        let reply: Reply;
+        beforeEach(async () => { reply = await api.call('GET', '/decisions', { headers: { 'x-user': value } }); });
+
+        it('THEN 401 UNAUTHENTICATED', () => {
+          expect(reply.status).toBe(401);
+          expect(reply.json.error.code).toBe('UNAUTHENTICATED');
+        });
+      });
+    });
+  }
+});
+
 describe('known paths reject methods that are not registered for them', () => {
   const ALL = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
   const byPattern = new Map<string, { example: string; methods: Set<string> }>();

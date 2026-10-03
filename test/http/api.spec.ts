@@ -741,3 +741,238 @@ describe('a failing persistence hook turns into a 500 without leaking details', 
     });
   });
 });
+
+describe('an Idempotency-Key cannot be reused for a different request', () => {
+  const KEY = { 'idempotency-key': 'k-1' };
+  const assign = (title: string) => ({ action: 'assign_followup', payload: { title, assigned_to: U.carol } });
+
+  describe('GIVEN a follow-up assigned with key k-1', () => {
+    const api = runningApi();
+    beforeEach(async () => {
+      proposed(api.log);
+      await actions(api.call, U.alice, assign('once'), KEY);
+    });
+
+    describe('WHEN k-1 is sent again with a different body', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await actions(api.call, U.alice, assign('something else'), KEY); });
+
+      it('THEN 409 CONFLICT and nothing new is assigned', () => {
+        expect(r.status).toBe(409);
+        expect(r.json.error.code).toBe('CONFLICT');
+        expect(api.log.listTodos({ user: U.carol }).total).toBe(1);
+      });
+    });
+  });
+});
+
+describe('owner, team and project endpoints', () => {
+  describe('GIVEN a running API with owner acme and project PRJ', () => {
+    const api = runningApi();
+
+    describe('WHEN a new owner globex is POSTed', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('POST', '/owners', { user: 'founder@globex.com', body: { identifier: 'globex', name: 'Globex' } }); });
+
+      it('THEN 201 with the owner', () => {
+        expect(r.status).toBe(201);
+        expect(r.json.owner).toMatchObject({ identifier: 'globex', name: 'Globex' });
+      });
+    });
+
+    describe('WHEN acme is POSTed again', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('POST', '/owners', { user: U.org, body: { identifier: 'acme' } }); });
+
+      it('THEN 409 CONFLICT', () => {
+        expect(r.status).toBe(409);
+        expect(r.json.error.code).toBe('CONFLICT');
+      });
+    });
+
+    describe('WHEN the org admin POSTs team payments', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('POST', '/teams', { user: U.org, body: { owner: 'acme', name: 'payments' } }); });
+
+      it('THEN 201 with an empty team', () => {
+        expect(r.status).toBe(201);
+        expect(r.json.team).toMatchObject({ owner: 'acme', name: 'payments', members: [] });
+      });
+    });
+
+    describe('WHEN bob, a plain member, POSTs a team', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('POST', '/teams', { user: U.bob, body: { owner: 'acme', name: 'payments' } }); });
+
+      it('THEN 403', () => {
+        expect(r.status).toBe(403);
+      });
+    });
+
+    describe('WHEN bob GETs /projects/PRJ', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/projects/PRJ', { user: U.bob }); });
+
+      it('THEN 200 with the project and its approval settings', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.project.identifier).toBe('PRJ');
+        expect(r.json.project.approval_settings.mode).toBe('consensus_voting');
+      });
+    });
+
+    describe('WHEN bob GETs /projects/NOPE', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/projects/NOPE', { user: U.bob }); });
+
+      it('THEN 404 NOT_FOUND', () => {
+        expect(r.status).toBe(404);
+        expect(r.json.error.code).toBe('NOT_FOUND');
+      });
+    });
+  });
+});
+
+describe('decision document, related links and integrity endpoints', () => {
+  describe('GIVEN an approved PRJ-001 and a draft PRJ-002 that mentions it', () => {
+    const api = runningApi({ mode: 'consensus_voting', finder: () => [] });
+    beforeEach(() => {
+      const id = proposed(api.log);
+      for (const u of [U.bob, U.carol, U.david]) act(api.log, id, u, 'vote', { vote: 'approve' });
+      draft(api.log, { title: 'Follow-on', content: 'Builds on PRJ-001.' });
+    });
+
+    describe('WHEN bob GETs /decisions/PRJ-001/document', () => {
+      let res: Response;
+      let body: string;
+      beforeEach(async () => {
+        res = await fetch(`${api.base}/decisions/PRJ-001/document`, { headers: { 'x-user': U.bob } });
+        body = await res.text();
+      });
+
+      it('THEN 200 markdown with the standard header', () => {
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toMatch(/text\/markdown/);
+        expect(body).toMatch(/^# PRJ-001: Migrate to new database/);
+        expect(body).toMatch(/- Status: Approved/);
+      });
+    });
+
+    describe('WHEN an outsider GETs /decisions/PRJ-001/document', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/decisions/PRJ-001/document', { user: U.outsider }); });
+
+      it('THEN 403 in the JSON error envelope', () => {
+        expect(r.status).toBe(403);
+        expect(r.json.error.code).toBe('FORBIDDEN');
+      });
+    });
+
+    describe('WHEN bob GETs /decisions/PRJ-002/related', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/decisions/PRJ-002/related', { user: U.bob }); });
+
+      it('THEN 200 listing the mention-derived link to PRJ-001', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.related.map((x: any) => x.related_decision_id)).toEqual(['PRJ-001']);
+      });
+    });
+
+    describe('WHEN bob GETs /decisions/PRJ-001/integrity', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/decisions/PRJ-001/integrity', { user: U.bob }); });
+
+      it('THEN 200 and the integrity check holds', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.integrity.ok).toBe(true);
+      });
+    });
+  });
+});
+
+describe('dashboard and notification endpoints', () => {
+  describe('GIVEN alice\'s proposal is open', () => {
+    const api = runningApi();
+    beforeEach(() => { proposed(api.log); });
+
+    describe('WHEN bob GETs /dashboard', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/dashboard', { user: U.bob }); });
+
+      it('THEN 200 with alice\'s proposal awaiting his approval', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.dashboard.awaiting_my_approval.map((d: any) => d.id)).toEqual(['PRJ-001']);
+      });
+    });
+
+    describe('WHEN bob GETs /notifications', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/notifications', { user: U.bob }); });
+
+      it('THEN 200 with his decision_proposed notification', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.notifications.some((n: any) => n.type === 'decision_proposed' && n.decision_id === 'PRJ-001')).toBe(true);
+      });
+    });
+
+    describe('WHEN alice GETs /notifications', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/notifications', { user: U.alice }); });
+
+      it('THEN her own proposal is not among them', () => {
+        expect(r.json.notifications.some((n: any) => n.type === 'decision_proposed')).toBe(false);
+      });
+    });
+  });
+});
+
+describe('export endpoint', () => {
+  describe('GIVEN two decisions', () => {
+    const api = runningApi();
+    beforeEach(() => { draft(api.log); draft(api.log, { title: 'Second' }); });
+
+    describe('WHEN the org admin GETs /export?format=csv', () => {
+      let res: Response;
+      let body: string;
+      beforeEach(async () => {
+        res = await fetch(`${api.base}/export?format=csv`, { headers: { 'x-user': U.org } });
+        body = await res.text();
+      });
+
+      it('THEN 200 text/csv with a header and two rows', () => {
+        expect(res.status).toBe(200);
+        expect(res.headers.get('content-type')).toMatch(/text\/csv/);
+        expect(body.trim().split('\n')[0]!.split(',')[0]).toBe('id');
+        expect(body.trim().split('\n').length).toBe(3);
+      });
+    });
+
+    describe('WHEN the org admin GETs /export?format=json', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/export?format=json', { user: U.org }); });
+
+      it('THEN 200 with both decisions', () => {
+        expect(r.status).toBe(200);
+        expect(r.json.decisions.map((d: any) => d.id).sort()).toEqual(['PRJ-001', 'PRJ-002']);
+      });
+    });
+
+    describe('WHEN bob, a plain member, GETs /export', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/export?format=json', { user: U.bob }); });
+
+      it('THEN 403', () => {
+        expect(r.status).toBe(403);
+      });
+    });
+
+    describe('WHEN the org admin GETs /export?format=xml', () => {
+      let r: Reply;
+      beforeEach(async () => { r = await api.call('GET', '/export?format=xml', { user: U.org }); });
+
+      it('THEN 400 VALIDATION_ERROR', () => {
+        expect(r.status).toBe(400);
+        expect(r.json.error.code).toBe('VALIDATION_ERROR');
+      });
+    });
+  });
+});
