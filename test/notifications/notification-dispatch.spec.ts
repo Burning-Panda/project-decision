@@ -3,7 +3,7 @@ import {
   Notifier, NotificationDispatcher, SqliteStore, buildLog, freshLog, proposed, act, makeClock, testBox, tmpDbFile, onCleanup, U,
   email, sms, push, sentResult, failedResult, SUBSCRIPTION,
   type FakeChannel, type LogHandle, type NotificationChannel,
-} from './support/index';
+} from '../support/index';
 
 // The dispatcher is the project-side glue (in-app notifications + profiles -> Notifier.send, with persistence and retries).
 // The notifications module itself knows none of this; see notifications.spec.ts for the tool.

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { freshLog, proposedIn, draft, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from './support/index';
+import { freshLog, proposedIn, draft, act, expectCode, U, CONTENT_V1, CONTENT_V2 } from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.

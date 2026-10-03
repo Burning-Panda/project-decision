@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   PostgresStore, MemoryStore, MIGRATIONS, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS,
   buildLog, startApi, makeClock, testBox, usePostgres, statementLog, HAS_PG, expectCode, act, U, CONTENT_V1,
-} from './support/index';
+} from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to reject are kept as a promise in WHEN and awaited in THEN.

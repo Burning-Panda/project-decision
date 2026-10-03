@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { OwnersService, TeamsService, ProjectsService, partsSetup, expectCode, U } from './support/index';
+import { OwnersService, TeamsService, ProjectsService, partsSetup, expectCode, U } from '../support/index';
 
 /** Registers a beforeEach that boots owner acme, a default team with alice (member) and bob (admin). */
 function acme() {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   DecisionLog, OwnersService, TeamsService, ProjectsService, DecisionsService, CommentsService,
   FollowupsService, RelatedService, ProfilesService, WebhooksService, InsightsService, buildLog, buildModule,
-} from './support/index';
+} from '../support/index';
 
 // Wiring only: every part is provided by the module and the facade is built from them.
 // Behaviour of each part is specified in its own spec (owners, teams, projects, project) and,

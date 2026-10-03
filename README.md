@@ -26,6 +26,7 @@ bun run start:dev        # watch mode
 | `bun run start` / `start:dev` / `start:debug` | Run the app (`nest start`, optionally watch/debug) |
 | `bun run build` / `start:prod` | Compile to `dist/` and run it |
 | `bun test` | Specs in `test/` (bun:test) |
+| `bun run test:foundation` | Only `test/domain` (owners, teams, projects, module wiring). Every other spec builds on these, so fix them first |
 | `bun run test:cov` | Tests with coverage |
 | `bun run lint` / `format` | oxlint (type-aware) / prettier |
 
@@ -52,7 +53,7 @@ Feature folders, each with a module, a controller and a `dto/` folder of validat
 | `src/ui/` | Serves the dependency-free web UI from `public/` at `/` |
 | `src/common/` | `DecisionLogError` and the `X-User` guard |
 | `src/helpers/` | Small single-purpose helpers grouped by action (`auth/`, `errors/`, `files/`, `http/`, `routing/`) |
-| `test/` | `*.spec.ts` (bun:test, nested GIVEN/WHEN/THEN). `test/support/` holds fixtures; `test/support/target.ts` is the only place specs import from `src/` |
+| `test/` | `*.spec.ts` (bun:test, nested GIVEN/WHEN/THEN; `test/http/routes.spec.ts` is the reference) in `domain/`, `decisions/`, `webhooks/`, `notifications/`, `storage/`, `http/`. `test/support/` holds fixtures; `test/support/target.ts` is the only place specs import from `src/` |
 | `backup/` | The original Node implementation, the porting reference |
 
 ## Behaviour notes / decisions where the plan was ambiguous

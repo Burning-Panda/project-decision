@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   freshLog, proposedIn, draft, act, attempt, expectCode, sha256, U, buildLog, MemoryStore, type LogHandle,
-} from './support/index';
+} from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN; when the

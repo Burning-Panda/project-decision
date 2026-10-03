@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { setup, proposed, act, draft, startApi, makeCaller, U, CONTENT_V1, CONTENT_V2, type LogHandle } from './support/index';
+import { setup, proposed, act, draft, startApi, makeCaller, U, CONTENT_V1, CONTENT_V2, type LogHandle } from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one request (beforeEach), THEN only asserts.
 // Every THEN runs against a freshly built log and API.

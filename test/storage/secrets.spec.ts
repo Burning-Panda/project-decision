@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   SecretBox, MemoryStore, SqliteStore, WebhookDispatcher, verifySignature, buildLog,
   makeClock, onCleanup, randomBytes, tmpDbFile, U,
-} from './support/index';
+} from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk (or promise) in WHEN and checked in THEN.

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   PushChannel, parseSubscription, PAYLOAD, SUBSCRIPTION,
   type DeliveryResult, type PushSubscription, type PushTransport,
-} from './support/index';
+} from '../support/index';
 
 const OTHER = { ...SUBSCRIPTION, endpoint: 'https://push.example.com/send/def' };
 const address = (subscription: unknown) => JSON.stringify(subscription);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { proposedIn, act, expectCode, U, FOLLOWUP as FU } from './support/index';
+import { proposedIn, act, expectCode, U, FOLLOWUP as FU } from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN.

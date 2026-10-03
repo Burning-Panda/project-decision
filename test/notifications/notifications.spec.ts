@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   Notifier, failedResult, FakeChannel, email, sms, push, PAYLOAD, U,
   type ChannelDelivery, type NotificationPayload,
-} from './support/index';
+} from '../support/index';
 
 const reachable: NotificationPayload = {
   ...PAYLOAD,

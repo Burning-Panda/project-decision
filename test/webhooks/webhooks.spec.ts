@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   WebhookDispatcher, verifySignature, SqliteStore, buildLog, freshLog, draft, proposed, act, attempt, expectCode,
   makeClock, testBox, tmpDbFile, onCleanup, U, URL_OK, PUBLIC_DNS, type LogHandle,
-} from './support/index';
+} from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Actions expected to fail are captured as a thunk in WHEN and invoked by expectCode in THEN; when the

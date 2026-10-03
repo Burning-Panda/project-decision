@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { buildLog, SqliteStore, makeClock, testBox, tmpDbFile, onCleanup, act, expectCode, U, CONTENT_V1 } from './support/index';
+import { buildLog, SqliteStore, makeClock, testBox, tmpDbFile, onCleanup, act, expectCode, U, CONTENT_V1 } from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
 // Every test gets its own database file and secret box; every store opened is closed after the test.

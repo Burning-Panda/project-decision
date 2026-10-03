@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { OwnersService, TeamsService, partsSetup, expectCode } from './support/index';
+import { OwnersService, TeamsService, partsSetup, expectCode } from '../support/index';
 
 type Parts = Awaited<ReturnType<typeof partsSetup>>;
 

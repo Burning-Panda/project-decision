@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { OwnersService, TeamsService, partsSetup, expectCode, U } from './support/index';
+import { OwnersService, TeamsService, partsSetup, expectCode, U } from '../support/index';
 
 /** Registers a beforeEach that boots the parts with owner acme and exposes the teams service. */
 function acme() {

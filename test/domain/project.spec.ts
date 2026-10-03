@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { Project, expectCode } from './support/index';
+import { Project, expectCode } from '../support/index';
 
 // Project is pure domain: no store, clock or audit. Everything it needs is passed in.
 const NOW = '2024-03-20T10:00:00.000Z';

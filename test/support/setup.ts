@@ -14,17 +14,22 @@ export const testBox = () => new SecretBox({ keys: [randomBytes(32)] });
 export async function setup({ startAt, finder, threshold, ...settings }: Record<string, any> = {}) {
   const clock = makeClock(startAt);
   const log = await buildLog({ clock: clock.now, relatedFinder: finder, relatedThreshold: threshold });
-  log.createOwner({ identifier: 'acme', name: 'Acme Inc', email: 'root@acme.com' });
-  for (const u of [U.alice, U.bob, U.carol, U.david]) {
-    log.addTeamMember({ owner: 'acme', team: 'default', user: u, role: 'member', actor: U.org });
+  try {
+    log.createOwner({ identifier: 'acme', name: 'Acme Inc', email: 'root@acme.com' });
+    for (const u of [U.alice, U.bob, U.carol, U.david]) {
+      log.addTeamMember({ owner: 'acme', team: 'default', user: u, role: 'member', actor: U.org });
+    }
+    log.addTeamMember({ owner: 'acme', team: 'default', user: U.lead, role: 'lead', actor: U.org });
+    log.createProject({
+      owner: 'acme', team: 'default', identifier: 'PRJ', title: 'Platform',
+      description: 'Platform decisions',
+      settings: Object.keys(settings).length ? { approval_settings: settings } : undefined,
+      actor: U.org,
+    });
+  } catch (e) {
+    // Nearly every spec builds on this fixture; point at the specs that pin it down instead of failing everywhere alike.
+    throw new Error(`setup(): building the owner/team/project fixture failed; fix test/domain first (bun run test:foundation). Cause: ${(e as Error)?.message ?? e}`, { cause: e });
   }
-  log.addTeamMember({ owner: 'acme', team: 'default', user: U.lead, role: 'lead', actor: U.org });
-  log.createProject({
-    owner: 'acme', team: 'default', identifier: 'PRJ', title: 'Platform',
-    description: 'Platform decisions',
-    settings: Object.keys(settings).length ? { approval_settings: settings } : undefined,
-    actor: U.org,
-  });
   return { log, clock };
 }
 

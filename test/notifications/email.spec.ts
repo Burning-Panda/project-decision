@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import {
   EmailChannel, MemoryMailTransport, Notifier, NotificationDispatcher, smtpTransport, setup, proposed, PAYLOAD, U,
   type DeliveryResult, type MailMessage, type MailTransport, type NotificationPayload,
-} from './support/index';
-import { startMockSmtp } from './support/mock-smtp';
+} from '../support/index';
+import { startMockSmtp } from '../support/mock-smtp';
 
 const FROM = 'Decision Log <noreply@example.com>';
 const payload: NotificationPayload = {
