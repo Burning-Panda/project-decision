@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'bun:test';
 import {
-  PostgresStore, MemoryStore, MIGRATIONS, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS,
+  PostgresStore, MIGRATIONS, allCollections,
   buildLog, startApi, makeClock, testBox, usePostgres, statementLog, HAS_PG, expectCode, act, U, CONTENT_V1,
 } from '../support/index';
 
@@ -50,7 +50,7 @@ function seededPostgres(pg: Pg, openOptions: () => Record<string, any> = () => (
 }
 
 // ---------------------------------------------------------------- pure checks (no database needed)
-describe('migrations are ordered, unique and cover every store collection', () => {
+describe('migrations are numbered 1..n and together give every collection a table', () => {
   describe('GIVEN the migration list', () => {
     describe('WHEN its versions are read', () => {
       let versions: number[];
@@ -66,29 +66,19 @@ describe('migrations are ordered, unique and cover every store collection', () =
     });
   });
 
-  for (const c of [...MAP_COLLECTIONS, ...ARRAY_COLLECTIONS, ...RECORD_COLLECTIONS]) {
-    describe('GIVEN migration 1', () => {
-      describe('WHEN its SQL for schema "s" is read', () => {
+  // Each feature adds its own migration, so only the full list must cover every collection.
+  for (const { name } of allCollections()) {
+    describe('GIVEN every migration', () => {
+      describe('WHEN their SQL for schema "s" is read', () => {
         let sql: string;
-        beforeEach(() => { sql = MIGRATIONS[0].up('s'); });
+        beforeEach(() => { sql = MIGRATIONS.map((m: any) => m.up('s')).join('\n'); });
 
-        it(`THEN it creates a table for ${c}`, () => {
-          expect(sql).toMatch(new RegExp(`"s"\\."${c}"`));
+        it(`THEN a table is created for ${name}`, () => {
+          expect(sql).toMatch(new RegExp(`CREATE TABLE (IF NOT EXISTS )?"s"\\."${name}"`, 'i'));
         });
       });
     });
   }
-
-  describe('GIVEN a memory store', () => {
-    describe('WHEN persistent is read', () => {
-      let persistent: boolean;
-      beforeEach(() => { persistent = new MemoryStore().persistent; });
-
-      it('THEN it is false', () => {
-        expect(persistent).toBe(false);
-      });
-    });
-  });
 });
 
 describe('schema names are validated before they can reach SQL', () => {

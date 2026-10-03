@@ -392,9 +392,9 @@ describe('a persistent store requires an explicit secret box; memory stores get 
       beforeEach(async () => {
         store.commit();
         const db = new SQL({ adapter: 'sqlite', filename: file, readonly: true });
-        const [{ json }] = await db`SELECT json FROM docs WHERE coll = 'webhooks'`;
+        const rows = await db`SELECT data FROM webhooks`;
         await db.close();
-        stored = String(json);
+        stored = rows.map((r: any) => String(r.data)).join('\n');
       });
 
       it('THEN the plaintext never reaches the database file', () => {

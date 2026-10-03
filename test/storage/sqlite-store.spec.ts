@@ -1,8 +1,184 @@
+import { SQL } from 'bun';
 import { describe, it, expect, beforeEach } from 'bun:test';
-import { buildLog, SqliteStore, makeClock, testBox, tmpDbFile, onCleanup, act, expectCode, U, CONTENT_V1 } from '../support/index';
+import {
+  buildLog, SqliteStore, SQLITE_MIGRATIONS, allCollections, makeClock, testBox, tmpDbFile, onCleanup, act, expectCode, U, CONTENT_V1,
+} from '../support/index';
 
 // Shape: GIVEN builds the state (beforeEach), WHEN performs the one action (beforeEach), THEN only asserts.
-// Every test gets its own database file and secret box; every store opened is closed after the test.
+// Every test gets its own database file (and secret box); every store opened is closed after the test.
+// The first sections use the store on its own (documents in, documents out); the later ones run a whole log on it.
+
+const ACME = { identifier: 'acme', name: 'Acme Inc' };
+
+/** Opens `file` as a bare store, closed after the test. */
+function openStore(file: string): any {
+  const store: any = SqliteStore.open(file);
+  onCleanup(() => store.close());
+  return store;
+}
+
+/** Runs `query` against `file` with a separate read-write connection and returns the rows. */
+async function sql(file: string, query: string): Promise<any[]> {
+  const db = new SQL({ adapter: 'sqlite', filename: file });
+  try { return await db.unsafe(query); } finally { await db.close(); }
+}
+
+// ---------------------------------------------------------------- the store on its own
+describe('SQLite migrations are numbered 1..n and together give every collection a table', () => {
+  describe('GIVEN the SQLite migration list', () => {
+    describe('WHEN its versions are read', () => {
+      let versions: number[];
+      beforeEach(() => { versions = SQLITE_MIGRATIONS.map((m) => m.version); });
+
+      it('THEN at least one migration exists', () => {
+        expect(versions.length).toBeGreaterThanOrEqual(1);
+      });
+
+      it('THEN they are 1..n with no gaps or repeats', () => {
+        expect(versions).toEqual(versions.map((_, i) => i + 1));
+      });
+    });
+  });
+
+  for (const { name } of allCollections()) {
+    describe('GIVEN every SQLite migration', () => {
+      describe('WHEN their SQL is read', () => {
+        let ddl: string;
+        beforeEach(() => { ddl = SQLITE_MIGRATIONS.map((m) => m.up()).join('\n'); });
+
+        it(`THEN a table is created for ${name}`, () => {
+          expect(ddl).toMatch(new RegExp(`CREATE TABLE (IF NOT EXISTS )?"?${name}"?\\s*\\(`, 'i'));
+        });
+      });
+    });
+  }
+});
+
+describe('opening a SQLite file applies migrations once, records them, and refuses a newer database', () => {
+  describe('GIVEN a new file', () => {
+    let file: string;
+    beforeEach(() => { file = tmpDbFile(); });
+
+    describe('WHEN it is opened and closed', () => {
+      beforeEach(() => { openStore(file).close(); });
+
+      it('THEN every migration is recorded in schema_migrations, in order', async () => {
+        const rows = await sql(file, 'SELECT version FROM schema_migrations ORDER BY version');
+        expect(rows.map((r) => r.version)).toEqual(SQLITE_MIGRATIONS.map((m) => m.version));
+      });
+    });
+  });
+
+  describe('GIVEN a file that was already opened once', () => {
+    let file: string;
+    beforeEach(() => {
+      file = tmpDbFile();
+      openStore(file).close();
+    });
+
+    describe('WHEN it is opened again', () => {
+      beforeEach(() => { openStore(file).close(); });
+
+      it('THEN no migration is applied twice', async () => {
+        const [{ n }] = await sql(file, 'SELECT count(*) AS n FROM schema_migrations');
+        expect(n).toBe(SQLITE_MIGRATIONS.length);
+      });
+    });
+  });
+
+  describe('GIVEN a file whose schema_migrations records version 999', () => {
+    let file: string;
+    beforeEach(async () => {
+      file = tmpDbFile();
+      openStore(file).close();
+      await sql(file, "INSERT INTO schema_migrations (version, name) VALUES (999, 'from the future')");
+    });
+
+    describe('WHEN it is opened', () => {
+      let opening: () => unknown;
+      beforeEach(() => { opening = () => openStore(file); });
+
+      it('THEN it refuses: the database is newer than the application', () => {
+        expect(opening).toThrow(/newer/i);
+      });
+    });
+  });
+});
+
+describe('SQLite keeps one table per collection, each document as JSON', () => {
+  describe('GIVEN owner acme committed and the file closed', () => {
+    let file: string;
+    beforeEach(() => {
+      file = tmpDbFile();
+      const store = openStore(file);
+      store.owners.set('acme', ACME);
+      store.commit();
+      store.close();
+    });
+
+    describe('WHEN the owners table is queried', () => {
+      let rows: any[];
+      beforeEach(async () => { rows = await sql(file, 'SELECT k, data FROM owners'); });
+
+      it('THEN there is one row keyed acme holding the document as JSON', () => {
+        expect(rows.map((r) => r.k)).toEqual(['acme']);
+        expect(JSON.parse(rows[0].data)).toEqual(ACME);
+      });
+    });
+  });
+});
+
+describe('committed documents survive reopening; uncommitted ones and deleted ones do not', () => {
+  describe('GIVEN acme committed, then globex added without committing, and the file closed', () => {
+    let file: string;
+    beforeEach(() => {
+      file = tmpDbFile();
+      const store = openStore(file);
+      store.owners.set('acme', ACME);
+      store.commit();
+      store.owners.set('globex', { identifier: 'globex' });
+      store.close();
+    });
+
+    describe('WHEN the file is reopened', () => {
+      let again: any;
+      beforeEach(() => { again = openStore(file); });
+
+      it('THEN acme is there and globex is not', () => {
+        expect(again.owners.get('acme')).toEqual(ACME);
+        expect(again.owners.has('globex')).toBe(false);
+      });
+
+      it('THEN the store reports that it is persistent', () => {
+        expect(again.persistent).toBe(true);
+      });
+    });
+  });
+
+  describe('GIVEN acme committed, then deleted and committed again', () => {
+    let file: string;
+    beforeEach(() => {
+      file = tmpDbFile();
+      const store = openStore(file);
+      store.owners.set('acme', ACME);
+      store.commit();
+      store.owners.delete('acme');
+      store.commit();
+      store.close();
+    });
+
+    describe('WHEN the file is reopened', () => {
+      let again: any;
+      beforeEach(() => { again = openStore(file); });
+
+      it('THEN acme is gone', () => {
+        expect(again.owners.has('acme')).toBe(false);
+      });
+    });
+  });
+});
+
+// ---------------------------------------------------------------- a whole log on SQLite
 
 type Opened = { log: any; store: any };
 type SqliteHandle = Opened & { id: string; reopen: () => Promise<Opened> };

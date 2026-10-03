@@ -9,3 +9,4 @@ export * from './memory-mail-transport';
 export { onCleanup } from './cleanup';
 export * from './crypto';
 export * from './pg';
+export * from './collections';

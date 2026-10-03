@@ -8,6 +8,8 @@
  *   src/api/api.module.ts                     ApiModule.register({ log, onMutation? }) -> the HTTP API
  *   src/storage/store.ts                      MemoryStore + collection lists
  *   src/storage/sqlite-store.ts               SqliteStore.open(file)
+ *   src/storage/migrations/sqlite.ts          MIGRATIONS (exported here as SQLITE_MIGRATIONS)
+ *   src/storage/data-migrations.ts            DATA_MIGRATIONS, applyDataMigrations
  *   src/storage/postgres-store.ts             PostgresStore.open(url, { schema, onConnectionLost, onStatement })
  *   src/storage/migrations/postgres.ts        MIGRATIONS
  *   src/storage/secrets.ts                    SecretBox
@@ -38,6 +40,9 @@ export { MemoryStore, MAP_COLLECTIONS, ARRAY_COLLECTIONS, RECORD_COLLECTIONS } f
 export { SqliteStore } from '../../src/storage/sqlite-store';
 export { PostgresStore } from '../../src/storage/postgres-store';
 export { MIGRATIONS } from '../../src/storage/migrations/postgres';
+export { MIGRATIONS as SQLITE_MIGRATIONS } from '../../src/storage/migrations/sqlite';
+export { DATA_MIGRATIONS, applyDataMigrations } from '../../src/storage/data-migrations';
+export type { DataMigration } from '../../src/storage/data-migrations';
 export { SecretBox } from '../../src/storage/secrets';
 export { WebhookDispatcher, verifySignature } from '../../src/webhooks/dispatcher';
 export { Notifier } from '../../src/notifications/index';
