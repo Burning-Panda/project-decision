@@ -27,7 +27,7 @@ bun run start:dev        # watch mode
 | `bun run build` / `start:prod` | Compile to `dist/` and run it |
 | `bun test` | Specs in `test/` (bun:test) |
 | `bun run test:foundation` | Only `test/domain` (owners, teams, projects, module wiring). Every other spec builds on these, so fix them first |
-| `bun run test:cov` | Tests with coverage |
+| `bun run test:cov` | Tests with coverage of `src/`; fails below 90% of lines or functions (`bunfig.toml`) |
 | `bun run lint` / `format` | oxlint (type-aware) / prettier |
 
 Storage is chosen by environment variable (set at most one; none = in-memory):

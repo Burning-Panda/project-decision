@@ -1,2 +1,8 @@
 [test]
 preload = ["./test/support/preload.ts"]
+
+# Applies to `bun run test:cov`. Measured over src/ only; specs and test support are excluded.
+# Expect it to fail until the stubs are implemented; it then guards against untested branches.
+coverageThreshold = { lines = 0.9, functions = 0.9 }
+coverageSkipTestFiles = true
+coveragePathIgnorePatterns = ["test/**"]
