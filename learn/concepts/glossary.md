@@ -20,3 +20,5 @@
 | Follow-up / todo | A task assigned on a decision. |
 | Webhook | An HTTP call to another system when something happens. |
 | Actor | The user performing an action (from the `X-User` header). |
+| Permission | A named capability such as `decision:approve`; roles are bundles of permissions. |
+| RBAC / ABAC | Role-based / attribute-based access control: decide from the subject's role, or from facts about subject, resource, action and context. |
