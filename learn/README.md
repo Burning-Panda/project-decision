@@ -26,7 +26,7 @@ If something you change breaks an earlier step, `bun run learn` says so and send
 2. Read the "What this usually means" note under the failure.
 3. Run `bun run learn hint`, more than once if needed. Hints go from "what the test wants" to "where to look", "a plan" and finally "almost the answer" (code with blanks).
 4. Read the concept the brief links to. `learn/concepts/` explains the ideas the steps use, in plain words with small examples:
-   reading test output, HTTP, errors, objects and copies, regex, JSON, async/await, Maps/arrays/records, classes, services and dependency injection, dates and the clock, SQL and migrations, hashing, state machines, permissions, comparing fractions, and a glossary of the domain words.
+   reading test output, HTTP, errors, objects and copies, regex, JSON, async/await, Maps/arrays/records, classes, services and dependency injection, dates and the clock, SQL and migrations, hashing, state machines, permissions, authorization models (roles, permissions, attributes), comparing fractions, and a glossary of the domain words.
 
 ## Rules of the house
 
@@ -52,6 +52,7 @@ If something you change breaks an earlier step, `bun run learn` says so and send
 9. The HTTP API.
 10. Async work and the network: webhook and notification delivery.
 11. Production database (optional, needs PostgreSQL).
+12. Authorization models: permission bundles, attribute rules, one policy for every check. Needs steps 09, 17 and 19; do it any time after them.
 
 ## Setup
 

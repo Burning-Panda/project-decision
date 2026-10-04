@@ -34,6 +34,7 @@ export const LEVELS = [
   'The HTTP API',
   'Async work and the network',
   'Production database',
+  'Authorization models',
 ];
 
 const routes = 'test/http/routes.spec.ts';
@@ -431,5 +432,19 @@ export const STEPS: Step[] = [
       { file: 'test/storage/postgres-store.spec.ts' },
       { file: collections, sections: ['every collection round-trips through PostgreSQL'] },
     ],
+  },
+
+  // ---- 12. Authorization models (needs steps 09, 17 and 19; can be done any time after them)
+  {
+    id: '46-permissions', level: 12, title: 'Permission-based checks: roles as bundles', edit: ['src/decision-log/core/permissions.ts'],
+    specs: [{ file: 'test/access/permissions.spec.ts' }],
+  },
+  {
+    id: '47-policy', level: 12, title: 'Attribute-based rules: allow, deny, explain', edit: ['src/decision-log/core/policy.ts'],
+    specs: [{ file: 'test/access/policy.spec.ts' }],
+  },
+  {
+    id: '48-access-wiring', level: 12, title: 'One policy for every check', edit: ['src/decision-log/core/access.service.ts', 'src/decision-log/decisions/decisions.service.ts', 'src/decision-log/teams/teams.service.ts'],
+    specs: [{ file: 'test/access/access.spec.ts' }],
   },
 ];

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { NotImplementedError } from '../../common/errors';
 import type { Team } from '../teams/team';
+import type { AccessVerdict, Action } from './policy';
 
 /** Who may do what. Pure authorization rules; no persistence of its own. */
 @Injectable()
@@ -13,5 +14,13 @@ export class AccessService {
   /** Org admin, or a team member with role `admin`. */
   isTeamAdmin(_actor: string, _team: Team): boolean {
     throw new NotImplementedError('AccessService.isTeamAdmin');
+  }
+
+  /**
+   * May `actor` perform `action` on something in `team`? Loads the facts (role, org admin) and asks `authorize`.
+   * `resourceOwner` is the decision's owner, when the action is on a decision.
+   */
+  check(_actor: string, _team: Team, _action: Action, _resourceOwner?: string): AccessVerdict {
+    throw new NotImplementedError('AccessService.check');
   }
 }

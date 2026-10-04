@@ -4,6 +4,8 @@
  *   src/decision-log/decision-log.ts          DecisionLog (domain service)
  *   src/decision-log/decision-log.module.ts   DecisionLogModule.register(options) -> provides DecisionLog + the services below
  *   src/decision-log/<feature>/<feature>.service.ts   Owners, Teams, Projects, Decisions, Comments, Followups, Related, Profiles, Webhooks, Insights
+ *   src/decision-log/core/permissions.ts      PERMISSIONS, permissionsOf, hasPermission (role -> permission bundles)
+ *   src/decision-log/core/policy.ts           authorize (pure attribute rules: allow, or deny with a reason)
  *   src/decision-log/projects/project.ts      Project (pure domain: create, resolveSettings)
  *   src/api/api.module.ts                     ApiModule.register({ log, onMutation? }) -> the HTTP API
  *   src/storage/store.ts                      MemoryStore + collection lists
@@ -26,6 +28,10 @@ import { onCleanup } from './cleanup';
 
 export { DecisionLog } from '../../src/decision-log/decision-log';
 export { Project } from '../../src/decision-log/projects/project';
+export { PERMISSIONS, permissionsOf, hasPermission } from '../../src/decision-log/core/permissions';
+export { authorize } from '../../src/decision-log/core/policy';
+export type { AccessRequest, AccessVerdict, Action } from '../../src/decision-log/core/policy';
+export { AccessService } from '../../src/decision-log/core/access.service';
 export { OwnersService } from '../../src/decision-log/owners/owners.service';
 export { TeamsService } from '../../src/decision-log/teams/teams.service';
 export { ProjectsService } from '../../src/decision-log/projects/projects.service';

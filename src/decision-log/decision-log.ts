@@ -7,6 +7,7 @@ import type { ProjectSettingsDto } from '../admin/dto/project-settings.dto';
 import type { CreateDecisionDto } from '../decisions/dto/create-decision.dto';
 import type { PerformActionDto } from '../decisions/dto/perform-action.dto';
 import type { CreateWebhookDto } from '../webhooks/dto/create-webhook.dto';
+import type { Action } from './core/policy';
 import { LogContext } from './core/log-context';
 import { AuditService } from './core/audit.service';
 import { OwnersService } from './owners/owners.service';
@@ -64,6 +65,7 @@ export class DecisionLog {
   getDecision(id: string, actor: string) { return this.decisions.get(id, actor); }
   listDecisions(filters: Record<string, any> = {}) { return this.decisions.list(filters); }
   perform(id: string, actor: string, request: PerformActionDto, opts: Record<string, any> = {}) { return this.decisions.perform(id, actor, request, opts); }
+  can(id: string, actor: string, action: Action) { return this.decisions.can(id, actor, action); }
   sweep() { return this.decisions.sweep(); }
   getVersions(id: string, actor: string) { return this.decisions.versions(id, actor); }
   diff(id: string, actor: string, range: Record<string, any> = {}) { return this.decisions.diff(id, actor, range as any); }

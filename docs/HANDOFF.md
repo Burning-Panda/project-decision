@@ -17,7 +17,7 @@ Written 2026-10-04, updated after level 7 (hints for steps 03–37). Read [`SUMM
 ## Current state
 
 - Branch `main`, clean tree. Last work: level 7 hint ladders (steps 31–37).
-- `bun test`: 789 tests, 143 pass, 646 fail (unwritten code, plus Postgres if no database). `bun run learn check` passes (46 steps, every spec section covered).
+- `bun test`: 873 tests, 143 pass, 730 fail (unwritten code, plus Postgres if no database). `bun run learn check` passes (46 steps, every spec section covered).
 - Step 03 (`src/ui/ui.controller.ts`, `@Get('app')` should be `@Get('app.js')`) is an **intentional** bug for learners. Leave it.
 - Postgres tests: `.env` sets `TEST_DATABASE_URL` to `decisions_test`, which did not exist at the last check (the owner said it was resolved earlier; re-verify before relying on it).
 
@@ -35,8 +35,15 @@ Written 2026-10-04, updated after level 7 (hints for steps 03–37). Read [`SUMM
 | Remaining todo | `docs/todos/learning-path.md` (solutions branch + `learn verify`) |
 | Scratch reference + playtest tools (outside the repo) | `/home/admin/work/project-decision-dev/` |
 
+## Level 12 (authorization models, steps 46-48)
+
+Added after level 11 so no step was renumbered; it only needs steps 09, 17 and 19, so a learner can do it any time after them (moving it earlier means renumbering briefs and `LEVELS`). Specs in `test/access/`, briefs with plain hints (no per-section ladders yet), reference in the dev repo (`core/permissions.ts`, `core/policy.ts`, `AccessService.check`, `DecisionsService.can`, `perform` and `addMember` throwing `FORBIDDEN` with `details.reason`). Verified: all 84 new tests pass against it with steps 0-37 still green.
+- Open: the policy lets the org admin vote, but `perform` today does not (voting needs a role). The specs deliberately leave org-admin voting unpinned; decide before writing ladders.
+- Note for the solutions branch: the reference does the refactor of steps 09/17 inside step 48 (old `canApprove`/`mayPerform` replaced by the policy).
+
 ## Not done (in priority order)
 
+0. Per-section hint ladders for steps 46-48 (14 sections), after the org-admin-vote question above.
 1. **Hint ladders for steps 38–45.** Next set is level 8: 38 listing/search, 39 dashboard/reports/export. Then 9 (40–42), 10 (43–44), 11 (45, optional Postgres). Steps 00–02 keep plain hints (they are worked examples).
 2. Concept explainers those levels need (sorting/paging, edit distance, HMAC and AES-GCM, retries/backoff, concurrency guards, SSRF).
 3. Solutions branch + `bun run learn verify` (see the todo). Needs the owner to say when.

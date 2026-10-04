@@ -7,6 +7,7 @@ import type { DiffQueryDto } from '../../decisions/dto/diff-query.dto';
 import { AccessService } from '../core/access.service';
 import { AuditService } from '../core/audit.service';
 import { LogContext } from '../core/log-context';
+import type { Action, AccessVerdict } from '../core/policy';
 import { ProjectsService } from '../projects/projects.service';
 
 /** Lifecycle: draft -> proposed -> approved | declined, plus revisions and integrity. */
@@ -27,6 +28,9 @@ export class DecisionsService {
 
   /** The action state machine (propose, approve, vote, ...). */
   perform(_id: string, _actor: string, _request: PerformActionDto, _opts?: Record<string, any>): any { throw new NotImplementedError('DecisionsService.perform'); }
+
+  /** Would `actor` be allowed to do `action` to this decision? Same rules `perform` enforces. NOT_FOUND if the decision does not exist. */
+  can(_id: string, _actor: string, _action: Action): AccessVerdict { throw new NotImplementedError('DecisionsService.can'); }
 
   /** Auto-approves proposals past their window; returns what changed. */
   sweep(): any { throw new NotImplementedError('DecisionsService.sweep'); }
