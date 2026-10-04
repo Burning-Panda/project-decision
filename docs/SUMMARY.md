@@ -12,7 +12,7 @@ It is also a **teaching repo**: most of the code is deliberately missing (stubs 
 
 - 789 tests in 29 spec files; 143 pass. The rest fail only because the code is not written yet. That is intended.
 - The server starts (`bun run start`), runs in memory, serves the web UI and Swagger. Endpoints that call unwritten code answer `500`.
-- The learning path has 46 steps in 12 levels. Steps 03–30 have full, tested hints. Steps 31–45 have older, simpler hints.
+- The learning path has 46 steps in 12 levels. Steps 03–37 have full, tested hints. Steps 38–45 have older, simpler hints.
 
 ## Done
 
@@ -40,13 +40,13 @@ It is also a **teaching repo**: most of the code is deliberately missing (stubs 
 **Learning path**
 - [x] Runner `bun run learn`: shows the first failing test of the first unfinished step, explains common failures in plain words, shows section progress, `hint`, `status`, `step`, `list`, `check`.
 - [x] 46 steps cover every test section; `bun run learn check` also runs in CI.
-- [x] Four-rung hints per test section (what it wants, where to look, a plan, a skeleton with blanks) for steps 03–30.
+- [x] Four-rung hints per test section (what it wants, where to look, a plan, a skeleton with blanks) for steps 03–37.
 - [x] 16 short concept explainers in `learn/concepts/` plus a glossary.
-- [x] Steps 03–30 were played through against a scratch implementation, which found two real problems in 03–25 (both fixed) and one trap in 27 (participants must be recorded inside the comment and meeting code, because the specs call those directly; the hint says so).
+- [x] Steps 03–37 were played through against a scratch implementation, which found two real problems in 03–25 (both fixed), one trap in 27 (participants must be recorded inside the comment and meeting code, because the specs call those directly; the hint says so) and one in 37 (`getDecision` must list `comments`; the old spec title promised incremental commits that nothing tests, so it was renamed).
 
 ## Not done
 
-- [ ] Four-rung hints for steps **31–45** (levels 7–11). Next up: level 7 (steps 31–37).
+- [ ] Four-rung hints for steps **38–45** (levels 8–11). Next up: level 8 (steps 38–39).
 - [ ] More concept explainers for later levels (sorting and paging, fuzzy matching, signing with HMAC, encryption, retries, concurrency, private-address blocking).
 - [ ] The **solutions branch** (one commit per step) and `learn verify`, which proves the step order works. See `docs/todos/learning-path.md`. Not to be built from the deleted `backup/src`.
 - [ ] A test run with real beginners (the best way to find missing hints).

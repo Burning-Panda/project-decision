@@ -1,6 +1,6 @@
 # Handoff (for the next session, written for Claude to resume cold)
 
-Written 2026-10-04, updated after level 6 (hints for steps 03–30). Read [`SUMMARY.md`](SUMMARY.md) first for the big picture. This file is only what you need to continue.
+Written 2026-10-04, updated after level 7 (hints for steps 03–37). Read [`SUMMARY.md`](SUMMARY.md) first for the big picture. This file is only what you need to continue.
 
 ## Owner's standing rules
 
@@ -16,7 +16,7 @@ Written 2026-10-04, updated after level 6 (hints for steps 03–30). Read [`SUMM
 
 ## Current state
 
-- Branch `main`, clean tree. Last work: level 6 hint ladders (steps 26–30).
+- Branch `main`, clean tree. Last work: level 7 hint ladders (steps 31–37).
 - `bun test`: 789 tests, 143 pass, 646 fail (unwritten code, plus Postgres if no database). `bun run learn check` passes (46 steps, every spec section covered).
 - Step 03 (`src/ui/ui.controller.ts`, `@Get('app')` should be `@Get('app.js')`) is an **intentional** bug for learners. Leave it.
 - Postgres tests: `.env` sets `TEST_DATABASE_URL` to `decisions_test`, which did not exist at the last check (the owner said it was resolved earlier; re-verify before relying on it).
@@ -37,7 +37,7 @@ Written 2026-10-04, updated after level 6 (hints for steps 03–30). Read [`SUMM
 
 ## Not done (in priority order)
 
-1. **Hint ladders for steps 31–45.** Next set is level 7: 31 audit chain, 32 idempotency, 33 secret box, 34 webhook registry, 35 events/outbox, 36 data migrations, 37 persisting the log. Then 8 (38–39), 9 (40–42), 10 (43–44), 11 (45, optional Postgres). Steps 00–02 keep plain hints (they are worked examples).
+1. **Hint ladders for steps 38–45.** Next set is level 8: 38 listing/search, 39 dashboard/reports/export. Then 9 (40–42), 10 (43–44), 11 (45, optional Postgres). Steps 00–02 keep plain hints (they are worked examples).
 2. Concept explainers those levels need (sorting/paging, edit distance, HMAC and AES-GCM, retries/backoff, concurrency guards, SSRF).
 3. Solutions branch + `bun run learn verify` (see the todo). Needs the owner to say when.
 4. Open question to the owner: `501` instead of `500` for endpoints that hit unwritten code.
@@ -46,7 +46,7 @@ Written 2026-10-04, updated after level 6 (hints for steps 03–30). Read [`SUMM
 
 The hints must be true, so each set is playtested before it is committed.
 
-1. **Scratch reference.** `/home/admin/work/project-decision-dev/reference/src/` covers levels 1–6 (steps 03–30). Extend it for the new level, from the specs and the README's behaviour notes, never from `backup/src`.
+1. **Scratch reference.** `/home/admin/work/project-decision-dev/reference/src/` covers levels 1–7 (steps 03–37). Extend it for the new level, from the specs and the README's behaviour notes, never from `backup/src`.
 2. **Playtest.** `/home/admin/work/project-decision-dev/tools/playtest.sh` builds a throwaway worktree of HEAD, lays the reference over it, copies the repo's current `test/`, `learn/`, `scripts/`, and runs `bun run learn status` (or `playtest.sh step 26`). Fix the reference until the new steps pass, then `playtest.sh clean`. Commit the extended reference in the dev repo. Never leave reference code on `main`.
 3. **If a spec is wrong** (it contradicts the README or another spec), fix the spec and commit it separately. If the hint approach hits a real gap, put the fix in the brief's skeleton, the step's "Common mistakes", and, if it is a recognisable failure shape, a rule in `diagnose()` in `scripts/learn.ts`.
 4. **Write the briefs** with `/home/admin/work/project-decision-dev/tools/brief_writer.py` (example use: `history/briefs3.py` there; do not re-run the history scripts, they overwrite hand edits). Format per step: `## Goal`, `## You'll learn`, `## Where`, `## Hints`, `## Common mistakes`. Under `## Hints`, one `### Section: <exact top-level describe title>` per spec section, each with four `#### ` rungs: *What the test wants*, *Where to look*, *Plan*, *Almost the answer* (code with `____` blanks, never the whole answer). `bun run learn check` fails if a section title is wrong.
@@ -64,6 +64,7 @@ The hints must be true, so each set is playtested before it is committed.
 - Participants are recorded inside `CommentsService.add` / `FollowupsService.addMeeting` / the vote and decline branches, not generically in `perform` (the specs call `addComment` directly).
 - New collections by step: 26 `comments`, `notifications`; 27 `meetings`; 28 `profiles` (MAP); 29 `followups`; 30 `relationships`. Each needs a store entry and a new SQLite migration.
 - Todo `overdue` is derived on read (`due_date < ctx.now().slice(0, 10)`, never for `completed`); `listTodos` slices after filtering and sorting, `total` before the slice.
+- Level 7 conventions: `AuditService.record` copies `before`/`after` and hashes `canonical()` (sorted-key) JSON with `hv: 2`; `perform` is a thin idempotency wrapper around a private `execute`; `store.idempotency` and `store.data_migrations` are RECORD collections; `LogContext.secretBox` is the configured box or an ephemeral one; `DecisionLog`'s constructor refuses a persistent store without a box and then runs `applyDataMigrations`; `WebhooksService.emit(type, owner, decisionId, payload)` writes `events` (`evt-NNN`) and pending `deliveries` (`dlv-N`, fields `status, attempts, next_attempt_at, last_status, last_error, delivered_at`); events are emitted after validation, org = `DecisionsService.ownerOf(d)`; `src/webhooks/targets.ts` (`assertAllowedUrl`, `isPrivateAddress`) is reused by the step 43 dispatcher; `getDecision` returns the stored decision plus `comments` and `followups`.
 - `AuditService.record` starts as a plain append (level 2) and becomes a hash chain in step 31.
 
 ## Pitfalls I hit
