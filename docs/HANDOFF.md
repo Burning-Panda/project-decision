@@ -7,6 +7,7 @@ Written 2026-10-04 at commit `f5b5712`. Read [`SUMMARY.md`](SUMMARY.md) first fo
 - Commit after each major file change (small, focused commits). Use the attribution line from the system reminder at the time.
 - Never use the deleted `backup/src` (git history before `ae08419`) as a reference or source for solutions.
 - Reference solutions belong on a separate branch, written later. Do not put solutions on `main`.
+- My scratch reference and playtest tools live **outside the repo**, in `/home/admin/work/project-decision-dev/` (its own git repo; see its README). Never copy that code into this repo.
 - Already-implemented code (Notifier, EmailChannel, smtpTransport, routing, XUserGuard) stays as worked examples.
 - Test style: `test/http/routes.spec.ts` is the reference (GIVEN/WHEN/THEN, `bun:test`, no `node:` imports, fresh state per test). Helpers live in `test/support/setup.ts` (`freshLog`, `proposedIn`, `attempt`, `expectCode`). Specs import `src/` only through `test/support/target.ts`.
 - Todos are written tersely: only what is needed to do the work later.
@@ -32,6 +33,7 @@ Written 2026-10-04 at commit `f5b5712`. Read [`SUMMARY.md`](SUMMARY.md) first fo
 | Server composition | `src/main.ts`, `src/server/{config,storage,jobs}.ts`; tests `test/server/*.test.ts` |
 | Storage contract | `src/storage/store.ts` (collection lists), `migrations/sqlite.ts`, `data-migrations.ts` |
 | Remaining todo | `docs/todos/learning-path.md` (solutions branch + `learn verify`) |
+| Scratch reference + playtest tools (outside the repo) | `/home/admin/work/project-decision-dev/` |
 
 ## Not done (in priority order)
 
@@ -44,10 +46,10 @@ Written 2026-10-04 at commit `f5b5712`. Read [`SUMMARY.md`](SUMMARY.md) first fo
 
 The hints must be true, so each set is playtested before it is committed.
 
-1. **Scratch reference.** It lives in the session scratchpad (`.../scratchpad/ref/`, built by `ref_apply.py` and `ref_decisions.ts`) and covers levels 1–5. It is **not in the repo and may be gone**. If so, rebuild it from the specs: the code is small, and levels 1–5 took one session. Extend it for the new level, from the specs (and the README's behaviour notes), not from `backup/src`.
-2. **Throwaway worktree.** `git worktree add --detach <scratch>/wt HEAD`, symlink `node_modules`, copy the reference `src/` over it, run `bun run learn status` there. Fix the reference until the new steps pass. Remove the worktree when done (`git worktree remove --force`, `git worktree prune`). Never leave reference code on `main`.
+1. **Scratch reference.** `/home/admin/work/project-decision-dev/reference/src/` covers levels 1–5 (steps 03–25). Extend it for the new level, from the specs and the README's behaviour notes, never from `backup/src`.
+2. **Playtest.** `/home/admin/work/project-decision-dev/tools/playtest.sh` builds a throwaway worktree of HEAD, lays the reference over it, copies the repo's current `test/`, `learn/`, `scripts/`, and runs `bun run learn status` (or `playtest.sh step 26`). Fix the reference until the new steps pass, then `playtest.sh clean`. Commit the extended reference in the dev repo. Never leave reference code on `main`.
 3. **If a spec is wrong** (it contradicts the README or another spec), fix the spec and commit it separately. If the hint approach hits a real gap, put the fix in the brief's skeleton, the step's "Common mistakes", and, if it is a recognisable failure shape, a rule in `diagnose()` in `scripts/learn.ts`.
-4. **Write the briefs** with a generator script (pattern: `briefs3.py` in the scratchpad). Format per step: `## Goal`, `## You'll learn`, `## Where`, `## Hints`, `## Common mistakes`. Under `## Hints`, one `### Section: <exact top-level describe title>` per spec section, each with four `#### ` rungs: *What the test wants*, *Where to look*, *Plan*, *Almost the answer* (code with `____` blanks, never the whole answer). `bun run learn check` fails if a section title is wrong.
+4. **Write the briefs** with `/home/admin/work/project-decision-dev/tools/brief_writer.py` (example use: `history/briefs3.py` there; do not re-run the history scripts, they overwrite hand edits). Format per step: `## Goal`, `## You'll learn`, `## Where`, `## Hints`, `## Common mistakes`. Under `## Hints`, one `### Section: <exact top-level describe title>` per spec section, each with four `#### ` rungs: *What the test wants*, *Where to look*, *Plan*, *Almost the answer* (code with `____` blanks, never the whole answer). `bun run learn check` fails if a section title is wrong.
 5. `bun run learn check`, `bun test` (numbers unchanged), commit.
 
 ## Behaviour the hints assume (keep consistent)
@@ -68,3 +70,4 @@ The hints must be true, so each set is playtested before it is committed.
 - A spec section added to any file must also be added to a step in `learn/steps.ts`, or `learn check` (and CI) fails.
 - `.learn/` (runner progress) is gitignored; delete it to see the new-learner experience.
 - Server tests are `*.test.ts` on purpose (outside the learning-path scan).
+- Re-running a brief generator overwrites hand edits (briefs 03, 14, 16, 17 were edited after generation).

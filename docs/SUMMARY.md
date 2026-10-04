@@ -85,5 +85,5 @@ It is also a **teaching repo**: most of the code is deliberately missing (stubs 
 - *Reference solutions go on a separate branch, written later,* and never from `backup/src`, as you decided.
 - *Hints per section on a four-rung ladder,* because a beginner stuck on one test should not read advice for the whole step, and should be able to stop at the rung that unblocks them.
 - *Related-decision finder: cosine similarity over word counts with stop words removed.* It passes the tests with a wide margin (98 vs 0), handles repetition and text length better than simple word overlap, and is the same maths used later for embeddings.
-- *Playtesting with a scratch implementation in a throwaway git worktree,* kept out of the repo so it does not pre-empt the solutions branch.
+- *Playtesting with a scratch implementation in a throwaway git worktree,* kept out of the repo (in `/home/admin/work/project-decision-dev/`, its own small git repo) so it does not pre-empt the solutions branch and survives between sessions.
 - *Server tests are `*.test.ts`,* so the learning-path check (which scans `*.spec.ts`) ignores them.
