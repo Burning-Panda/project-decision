@@ -329,7 +329,7 @@ export const STEPS: Step[] = [
       { file: audit, sections: ['state survives a JSON round trip including id counters and audit chain'] },
       { file: sqlite, sections: [
         'state committed to SQLite survives reopening, including audit chain and counters',
-        'uncommitted changes are not persisted; later commits are incremental and idempotent',
+        'uncommitted changes are not persisted; committing again changes nothing',
         'deletions are persisted',
         'a failed commit rolls back as a whole',
       ] },

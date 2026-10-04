@@ -271,7 +271,7 @@ describe('state committed to SQLite survives reopening, including audit chain an
   });
 });
 
-describe('uncommitted changes are not persisted; later commits are incremental and idempotent', () => {
+describe('uncommitted changes are not persisted; committing again changes nothing', () => {
   /** The seeded state committed, then a second comment added without committing, and the store closed. */
   function withUncommittedComment() {
     const h = seededSqlite();
