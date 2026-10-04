@@ -37,7 +37,7 @@ Alice uses `assign_followup` (the `FOLLOWUP` fixture, to bob): 201 and `data.fol
 1. Register the handler: status 201, `data: { followup }`. Add `followups` to `ARRAY_COLLECTIONS` and a migration. Inject `ProfilesService`.
 2. `addFollowup`: access check (`this.decisions.get`), validate (next section), build the record with id `followup-` + the count + 1 padded to three digits.
 3. `notify(assigned_to, 'followup_assigned', d, actor)`.
-4. In `DecisionsService.get`: `return { ...d, followups: this.ctx.store.followups.filter((f) => f.decision_id === id) }`.
+4. In `DecisionsService.get`: `return { ...d, followups: this.ctx.store.followups.filter((f) => f.decision_id === id) }`. (Step 37's spec also reads `getDecision(id).comments`; attach the decision's comments in the same place, now or then.)
 
 #### Almost the answer
 

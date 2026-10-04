@@ -279,7 +279,7 @@ export const STEPS: Step[] = [
     ] }],
   },
   {
-    id: '32-idempotency', level: 7, title: 'Idempotency: safe retries', edit: ['src/decision-log/decisions/decisions.service.ts'],
+    id: '32-idempotency', level: 7, title: 'Idempotency: safe retries', edit: ['src/decision-log/decisions/decisions.service.ts', 'src/storage/store.ts', 'src/storage/migrations/sqlite.ts'],
     specs: [{ file: audit, sections: [
       'idempotency keys make retries safe',
       'an idempotency key cannot be reused for a different request',
@@ -294,7 +294,7 @@ export const STEPS: Step[] = [
     ] }],
   },
   {
-    id: '34-webhook-registry', level: 7, title: 'Registering webhooks safely', edit: ['src/decision-log/webhooks/webhooks.service.ts'],
+    id: '34-webhook-registry', level: 7, title: 'Registering webhooks safely', edit: ['src/decision-log/webhooks/webhooks.service.ts', 'src/webhooks/targets.ts', 'src/decision-log/core/log-context.ts', 'src/storage/store.ts', 'src/storage/migrations/sqlite.ts'],
     specs: [{ file: webhooks, sections: [
       'org admins register webhooks; the secret is shown once and never listed',
       'webhook URLs and event filters are validated',
@@ -302,7 +302,7 @@ export const STEPS: Step[] = [
     ] }],
   },
   {
-    id: '35-events-outbox', level: 7, title: 'Events and the outbox', edit: ['src/decision-log/webhooks/webhooks.service.ts', 'src/decision-log/decisions/decisions.service.ts'],
+    id: '35-events-outbox', level: 7, title: 'Events and the outbox', edit: ['src/decision-log/webhooks/webhooks.service.ts', 'src/decision-log/decisions/decisions.service.ts', 'src/decision-log/comments/comments.service.ts', 'src/decision-log/followups/followups.service.ts', 'src/storage/store.ts', 'src/storage/migrations/sqlite.ts'],
     specs: [{ file: webhooks, sections: [
       'events are recorded in the outbox and fan out to matching active hooks of the same org only',
       'wildcard family filters match',
@@ -312,7 +312,7 @@ export const STEPS: Step[] = [
     ] }],
   },
   {
-    id: '36-data-migrations', level: 7, title: 'Evolving stored data: data migrations', edit: ['src/storage/data-migrations.ts', 'src/decision-log/decision-log.ts', 'src/decision-log/webhooks/webhooks.service.ts'],
+    id: '36-data-migrations', level: 7, title: 'Evolving stored data: data migrations', edit: ['src/storage/data-migrations.ts', 'src/decision-log/decision-log.ts', 'src/decision-log/webhooks/webhooks.service.ts', 'src/storage/store.ts', 'src/storage/migrations/sqlite.ts'],
     specs: [
       { file: 'test/storage/data-migrations.spec.ts' },
       { file: secrets, sections: [
@@ -324,7 +324,7 @@ export const STEPS: Step[] = [
     ],
   },
   {
-    id: '37-persisting-the-log', level: 7, title: 'The whole log, persisted', edit: ['src/storage/sqlite-store.ts', 'src/storage/store.ts'],
+    id: '37-persisting-the-log', level: 7, title: 'The whole log, persisted', edit: ['src/decision-log/decisions/decisions.service.ts', 'src/storage/sqlite-store.ts', 'src/storage/store.ts'],
     specs: [
       { file: audit, sections: ['state survives a JSON round trip including id counters and audit chain'] },
       { file: sqlite, sections: [
